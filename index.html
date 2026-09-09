@@ -762,6 +762,48 @@ async function writeFieldToSheet(sheetKey, id, field, value){
   }
 }
 
+/**
+ * Agrega una fila nueva (publicación de Comunicaciones o acción de Operaciones) en Google
+ * Sheets a través de la API. Devuelve el id asignado por el servidor (o null si falló),
+ * que debe usarse como id del nuevo elemento en el estado local — nunca se genera el id
+ * en el navegador, porque solo el Sheet sabe en qué fila quedó guardada la fila nueva.
+ */
+async function appendRowToSheet(sheetKey, data){
+  try{
+    const res = await fetch(API_BASE_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ sheet: sheetKey, op: 'append', data })
+    });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || 'Error desconocido');
+    return json.id;
+  } catch(err){
+    console.error('Error agregando fila en Sheets:', err);
+    return null;
+  }
+}
+
+/**
+ * Elimina (limpia el contenido de) una fila en Google Sheets a través de la API.
+ * Devuelve true/false según si se pudo guardar el borrado.
+ */
+async function deleteRowFromSheet(sheetKey, id){
+  try{
+    const res = await fetch(API_BASE_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ sheet: sheetKey, op: 'delete', id })
+    });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || 'Error desconocido');
+    return true;
+  } catch(err){
+    console.error('Error eliminando fila en Sheets:', err);
+    return false;
+  }
+}
+
 /** Marca visualmente un elemento como guardado (verde) o con error (rojo), brevemente. */
 function flashSaveState(el, ok){
   if(!el) return;
@@ -887,7 +929,16 @@ function renderComms(){
     if(el.dataset.field){
       el.addEventListener('change', onCommsFieldChange);
     } else if(el.dataset.action==='delComms'){
-      el.addEventListener('click', ()=>{ comms = comms.filter(c=>c.id!=el.dataset.id); refreshComms(); });
+      el.addEventListener('click', async ()=>{
+        const id = Number(el.dataset.id);
+        el.disabled = true;
+        const ok = await deleteRowFromSheet('comunicaciones', id);
+        el.disabled = false;
+        if(!ok){ alert('No se pudo eliminar la publicación en Google Sheets. Intenta de nuevo.'); return; }
+        comms = comms.filter(c=>c.id!=id);
+        refreshComms();
+        setLiveSyncStatus('🟢 Publicación eliminada en Google Sheets', true);
+      });
     }
   });
 }
@@ -946,18 +997,31 @@ document.getElementById('commsEstadoFilter').addEventListener('change', renderCo
 document.getElementById('commsTagFilter').addEventListener('change', renderComms);
 document.getElementById('commsSearch').addEventListener('input', renderComms);
 
-document.getElementById('addCommsBtn').addEventListener('click', ()=>{
+document.getElementById('addCommsBtn').addEventListener('click', async ()=>{
   const fase = document.getElementById('newFase').value.trim();
   const periodo = document.getElementById('newPeriodo').value.trim();
   const canal = document.getElementById('newCanal').value.trim() || 'Multicanal';
   const tema = document.getElementById('newTema').value.trim();
   if(!tema){ alert('Escribe al menos el tema de la publicación.'); return; }
-  comms.push({id: nextCommsId++, evento:'connectathon', fase: fase || 'Sin fase asignada', periodo: periodo || 'Sin período asignado', dia:'', canal, tema, estado:'no_publicada', responsable:'', alcance:null, inscritos:null, tags:[]});
+  const btn = document.getElementById('addCommsBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const newItem = {evento:'connectathon', fase: fase || 'Sin fase asignada', periodo: periodo || 'Sin período asignado', dia:'', canal, tema, estado:'no_publicada', responsable:'', alcance:null, inscritos:null, tags:[]};
+  const newId = await appendRowToSheet('comunicaciones', newItem);
+  btn.disabled = false; btn.textContent = originalLabel;
+  if(newId === null){
+    alert('No se pudo guardar la publicación en Google Sheets. Revisa tu conexión e intenta de nuevo.');
+    return;
+  }
+  newItem.id = newId;
+  comms.push(newItem);
+  nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
   document.getElementById('newFase').value='';
   document.getElementById('newPeriodo').value='';
   document.getElementById('newCanal').value='';
   document.getElementById('newTema').value='';
   refreshComms();
+  setLiveSyncStatus('🟢 Publicación guardada en Google Sheets', true);
 });
 
 // ================= OPS =================
@@ -1058,7 +1122,16 @@ function renderOps(){
     if(el.dataset.field){
       el.addEventListener('change', onOpsFieldChange);
     } else if(el.dataset.action==='delOps'){
-      el.addEventListener('click', ()=>{ ops = ops.filter(o=>o.id!=el.dataset.id); refreshOps(); });
+      el.addEventListener('click', async ()=>{
+        const id = Number(el.dataset.id);
+        el.disabled = true;
+        const ok = await deleteRowFromSheet('operaciones', id);
+        el.disabled = false;
+        if(!ok){ alert('No se pudo eliminar la acción en Google Sheets. Intenta de nuevo.'); return; }
+        ops = ops.filter(o=>o.id!=id);
+        refreshOps();
+        setLiveSyncStatus('🟢 Acción eliminada en Google Sheets', true);
+      });
     }
   });
 }
@@ -1084,14 +1157,27 @@ document.getElementById('opsSeccionFilter').addEventListener('change', renderOps
 document.getElementById('opsEstadoFilter').addEventListener('change', renderOps);
 document.getElementById('opsSearch').addEventListener('input', renderOps);
 
-document.getElementById('addOpsBtn').addEventListener('click', ()=>{
+document.getElementById('addOpsBtn').addEventListener('click', async ()=>{
   const seccion = document.getElementById('newAccionSeccion').value;
   const texto = document.getElementById('newAccionTexto').value.trim();
   if(!texto){ alert('Escribe la acción.'); return; }
   const secInfo = ops.find(o=>o.seccion===seccion);
-  ops.push({id: nextOpsId++, seccion, seccionTitulo: secInfo.seccionTitulo, plazo: secInfo.plazo, texto, completado:false, responsable:'', correo:'', telefono:''});
+  const btn = document.getElementById('addOpsBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const newItem = {seccion, seccionTitulo: secInfo.seccionTitulo, plazo: secInfo.plazo, texto, completado:false, responsable:'', correo:'', telefono:''};
+  const newId = await appendRowToSheet('operaciones', newItem);
+  btn.disabled = false; btn.textContent = originalLabel;
+  if(newId === null){
+    alert('No se pudo guardar la acción en Google Sheets. Revisa tu conexión e intenta de nuevo.');
+    return;
+  }
+  newItem.id = newId;
+  ops.push(newItem);
+  nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
   document.getElementById('newAccionTexto').value='';
   refreshOps();
+  setLiveSyncStatus('🟢 Acción guardada en Google Sheets', true);
 });
 
 // ================= Export / Import (no localStorage allowed) =================
