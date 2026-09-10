@@ -1225,10 +1225,14 @@ function renderEcopass(){
     const pct = p.aforo ? Math.round((p.inscritos/p.aforo)*100) : null;
     let ts = p.verificado;
     try{ ts = new Date(p.verificado).toLocaleString('es-CL', {dateStyle:'medium', timeStyle:'short'}); }catch(e){}
-    const agotado = p.estado && p.estado.trim().toLowerCase() === 'agotado';
-    const cta = !agotado
-      ? `<a class="ep-cta enabled" href="${p.linkCompra}" target="_blank" rel="noopener">🎟 Comprar tickets ↗</a>`
-      : `<span class="ep-cta disabled">🎟 Entradas agotadas</span>`;
+    const estadoNorm = (p.estado || '').trim().toLowerCase();
+    const agotado = estadoNorm === 'agotado';
+    const oculto = estadoNorm === 'oculto momentáneamente' || estadoNorm === 'oculto' || estadoNorm === 'oculto momentaneamente';
+    const cta = oculto
+      ? `<span class="ep-cta disabled">🕓 Aún no disponible</span>`
+      : (!agotado
+        ? `<a class="ep-cta enabled" href="${p.linkCompra}" target="_blank" rel="noopener">🎟 Comprar tickets ↗</a>`
+        : `<span class="ep-cta disabled">🎟 Entradas agotadas</span>`);
     const aforoTxt = p.aforo ? `${p.inscritos} / ${p.aforo} (${pct}%)` : `${p.inscritos} (aforo por confirmar)`;
     return `
       <div class="ecopass-card">
