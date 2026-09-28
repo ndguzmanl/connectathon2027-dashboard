@@ -177,6 +177,12 @@
         <option value="Estimado">Estimado</option>
         <option value="Estimada">Estimada</option>
       </select>
+      <select id="cartaTipoDestinatario">
+        <option value="">Tipo de destinatario…</option>
+        <option value="autoridad">Autoridad</option>
+        <option value="miembro">Miembro HL7</option>
+        <option value="sponsor">Sponsor</option>
+      </select>
       <input type="text" id="cartaNombre" placeholder="Nombre completo del destinatario">
       <input type="text" id="cartaCargo" placeholder="Cargo (opcional)">
       <input type="text" id="cartaOrganizacion" placeholder="Organización (opcional)">
@@ -837,6 +843,36 @@ El evento se realizará los días 12, 13 y 14 de enero de 2027 en la Universidad
 
 Esperando poder contar con su participación, se despide cordialmente.`;
 
+const CARTA_TEXTO_AUTORIDAD = `Reciba un cordial saludo de HL7 Chile (Filial de HL7 Internacional) organizador de FHIR Connectathon-CL 2027, a desarrollarse los días 12, 13 y 14 de enero de 2027, en la ciudad de Santiago.
+Este evento reunirá a directivos de la red asistencial, prestadores de servicios de salud, proveedores y emprendedores del mundo de los Sistemas de Información y permitirá conocer el estado de madurez del ecosistema de salud en el desarrollo de soluciones, por medio del uso del estándar FHIR, así como también el poder demostrar que la interoperabilidad tiene un valor tangible al momento de poder llevarla a cabo y validad nuestras guías de implementación que son un bien público nacional.
+La inauguración de este evento se realizará el día martes 12 de enero de 2027, desde las 9:00h en el aula magna de la Universidad San Sebastián. Este día inaugural estará enfocado en mostrar el valor de la interoperabilidad en salud, en base a charlas y talleres desarrollados por expertos/as tanto internacionales como nacionales, teniendo como foco un público de alta gerencia y gestión en salud.
+Dada la importancia de su Organización, Empresa, Servicio, Clínica, Hospital, etc. a nivel nacional, contar con ustedes para HL7 Chile, sería muy relevante dado que estos eventos de innovación y colaboración, conecta con otros desarrolladores expertos y apasionados por la tecnología y contribuye al crecimiento y desarrollo de nuestro sistema de salud conectado. Sería un honor contar con su representación como invitado/a especial de HL7 Chile, más dos personas de acompañantes.
+Agradeceríamos que pueda confirmar su participación y la de los acompañantes, en respuesta de este correo.
+Se despide cordialmente,`;
+
+const CARTA_TEXTO_MIEMBRO = `Reciba un cordial saludo de HL7 Chile (Filial de HL7 Inernacional) organizador FHIR Connectathon-CL 2027, a desarrollarse los días 12, 13 y 14 de enero de 2027, en la ciudad de Santiago.
+Este evento reunirá a directivos de la red asistencial, prestadores de servicios de salud, proveedores y emprendedores del mundo de los Sistemas de Información y permitirá conocer el estado de madurez del ecosistema de salud en el desarrollo de soluciones, por medio del uso del estándar FHIR, así como también el poder demostrar que la interoperabilidad tiene un valor tangible al momento de poder llevarla a cabo y validad nuestras guías de implementación que son un bien público nacional.
+La inauguración de este evento se realizará el día martes 12 de enero de 2027, desde las 9:00h en el aula magna de la Universidad San Sebastián. Este día inaugural estará enfocado en mostrar el valor de la interoperabilidad en salud, en base a charlas y talleres desarrollados por expertos/as tanto internacionales como nacionales, teniendo como foco un público de alta gerencia y gestión en salud.
+Dada la experiencia de la empresa que usted representa, y cargo que desempeña, así como el aporte que su empresa ha desarrollado en Chile durante los últimos años, y el apoyo que nos han brindado como organización, es que nos encantaría contar con su presencia el día inaugural (12 enero) como invitado/a especial de HL7 Chile, más dos personas que le acompañen, y compartir con nosotros las actividades descritas anteriormente que se detallan en el programa que tenemos preparado para ese día.
+Sería un honor poder contar con su presencia y agradeceríamos que pueda confirmar su participación a la brevedad, respondiendo a este correo, dado que los cupos son limitados.
+Esperando poder contar con su participación, se despide cordialmente.`;
+
+const CARTA_TEXTO_SPONSOR = `Reciba un cordial saludo de HL7 Chile (Filial de HL7 Internacional) organizadores de FHIR Connectathon-CL 2027, a desarrollarse los días 12, 13 y 14 de enero de 2027, en la ciudad de Santiago.
+Este evento reunirá a directivos de la red asistencial, prestadores de servicios de salud, proveedores y emprendedores del mundo de los Sistemas de Información y permitirá conocer el estado de madurez del ecosistema de salud en el desarrollo de soluciones, por medio del uso del estándar FHIR, así como también el poder demostrar que la interoperabilidad tiene un valor tangible al momento de poder llevarla a cabo y validad nuestras guías de implementación que son un bien público nacional.
+La inauguración de este evento se realizará el martes 12 de enero de 2027, desde las 9:00h en el aula magna de la Universidad San Sebastián. Este día inaugural estará enfocado en mostrar el valor de la interoperabilidad en salud, en base a charlas y talleres desarrollados por expertos/as tanto internacionales como nacionales, teniendo como foco un público de alta gerencia y gestión en salud.
+Por lo antes mencionado, queremos invitarle como invitado especial, dado su cargo de representación de uno de nuestros SPONSOR de la Connectathon-CL 2027, al día inaugural junto a 2 personas más que Ud. designe
+Dada la importancia de su Organización a nivel nacional, contar con ustedes para HL7 Chile, sería muy relevante dado que estos eventos de innovación y colaboración, conecta con otros desarrolladores expertos y apasionados por la tecnología y contribuye al crecimiento y desarrollo de nuestro sistema de salud conectado.
+
+Sería un honor poder contar con su presencia y agradeceríamos que pueda confirmar su participación a la brevedad, respondiendo a este correo, dado que los cupos son limitados.
+
+Esperando poder contar con su participación, se despide cordialmente.`;
+
+const CARTA_TEXTOS_POR_TIPO = {
+  autoridad: CARTA_TEXTO_AUTORIDAD,
+  miembro: CARTA_TEXTO_MIEMBRO,
+  sponsor: CARTA_TEXTO_SPONSOR
+};
+
 // ---------- Tabs ----------
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
@@ -1410,6 +1446,11 @@ document.getElementById('generarCartaBtn').addEventListener('click', ()=>{
   document.getElementById('cartaNombre').value = '';
   document.getElementById('cartaCargo').value = '';
   document.getElementById('cartaOrganizacion').value = '';
+});
+
+document.getElementById('cartaTipoDestinatario').addEventListener('change', (e)=>{
+  const tipo = e.target.value;
+  document.getElementById('cartaTexto').value = CARTA_TEXTOS_POR_TIPO[tipo] || CARTA_TEXTO_DEFAULT;
 });
 
 // init
