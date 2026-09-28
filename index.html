@@ -90,6 +90,7 @@
   .chip.whatsapp{background:#25d36633; color:#7fe0a8;}
   .chip.cobertura{background:#4da6ff33; color:#9cc9ff;}
   .periodo{color:var(--text-dim); font-size:12px;}
+  input.periodo-input{font-size:12px; color:var(--text-dim); min-width:150px;}
   .section-title{
     font-size:14px; font-weight:700; margin:22px 0 8px; padding-top:14px; border-top:1px solid var(--border);
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -917,7 +918,7 @@ function renderComms(){
     tr.innerHTML = `
       <td><input type="checkbox" class="row-check" ${c.estado==='publicada'?'checked':''} data-id="${c.id}" data-field="estadoToggle"></td>
       <td><span class="fase-badge">${c.fase}</span>${c.fusionada? ' <span class="section-note">(semanas fusionadas)</span>':''}</td>
-      <td class="periodo">${c.periodo}${c.dia? ' · '+c.dia:''}</td>
+      <td class="periodo"><input class="mini periodo-input" type="text" value="${escapeHtml(c.periodo)}" data-id="${c.id}" data-field="periodo">${c.dia? ' <span class="section-note">· '+escapeHtml(c.dia)+'</span>':''}</td>
       <td><input class="mini" type="text" value="${escapeHtml(c.canal)}" data-id="${c.id}" data-field="canal"></td>
       <td class="texto-cell" style="min-width:220px;">${escapeHtml(c.tema)}<div>${renderTags(c.tags)}</div></td>
       <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(c.responsable)}" data-id="${c.id}" data-field="responsable"></td>
