@@ -143,14 +143,17 @@
   .trend-row .t-delta.up{color:var(--ok);}
   .trend-row .t-delta.zero{color:var(--text-dim); font-weight:400;}
   .trend-row .t-estado{font-size:10.5px; color:var(--text-dim); text-align:right;}
-  .carta-form{display:grid; grid-template-columns:110px 1.4fr 1.2fr 1.2fr 1fr 150px; gap:8px;}
-  .carta-form select, .carta-form input{width:100%;}
   .carta-texto{
     width:100%; margin-top:10px; background:#0d1526; border:1px solid var(--border); color:var(--text);
     border-radius:8px; padding:10px 12px; font-size:12.5px; font-family:inherit; resize:vertical;
   }
+  .carta-texto:disabled{opacity:.7; resize:none;}
   .carta-actions{display:flex; gap:6px; flex-wrap:wrap;}
   .carta-actions .btn.small{padding:5px 9px; font-size:11px;}
+  .carta-plantilla{margin-bottom:16px;}
+  .carta-plantilla:last-of-type{margin-bottom:0;}
+  .carta-plantilla-header{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .carta-plantilla-header strong{font-size:13.5px;}
 </style>
 </head>
 <body>
@@ -168,46 +171,11 @@
 </div>
 
 <main>
-  <div class="ecopass-wrap" id="ecopassCard"></div>
-  <div class="chart-card" id="inscritosSeguimientoCard" style="margin:14px 32px 0; max-height:none;"></div>
-
-  <div class="chart-card" style="margin:14px 32px 0; max-height:none;">
-    <div class="trend-title" style="margin-bottom:12px;">📜 Cartas Especiales</div>
-    <div class="carta-form">
-      <select id="cartaTratamiento">
-        <option value="Estimado">Estimado</option>
-        <option value="Estimada">Estimada</option>
-      </select>
-      <select id="cartaTipoDestinatario">
-        <option value="">Tipo de destinatario…</option>
-        <option value="autoridad">Autoridad</option>
-        <option value="miembro">Miembro HL7</option>
-        <option value="sponsor">Sponsor</option>
-      </select>
-      <input type="text" id="cartaNombre" placeholder="Nombre completo del destinatario">
-      <input type="text" id="cartaCargo" placeholder="Cargo (opcional)">
-      <input type="text" id="cartaOrganizacion" placeholder="Organización (opcional)">
-      <input type="text" id="cartaCiudad" placeholder="Ciudad de emisión" value="Valparaíso">
-      <input type="date" id="cartaFecha">
-    </div>
-    <textarea id="cartaTexto" class="carta-texto" rows="6"></textarea>
-    <div style="margin-top:10px;">
-      <button class="btn" id="generarCartaBtn">+ Generar carta</button>
-      <span class="section-note">Solo se personalizan: tratamiento, nombre, texto y fecha de emisión — el resto de la plantilla (logos, firma) es fijo.</span>
-    </div>
-    <table style="margin-top:16px;">
-      <thead><tr>
-        <th>Destinatario</th><th>Cargo / Organización</th><th>Fecha emisión</th><th>Creada</th><th>Acciones</th>
-      </tr></thead>
-      <tbody id="cartasBody"></tbody>
-    </table>
-    <p class="footer-note" style="margin-top:10px;">
-      "Descargar PDF" genera el documento en tu navegador con el mismo formato de la carta de referencia (HL7 Chile + Universidad San Sebastián). "Enviar a correo" descarga el PDF y abre tu cliente de correo con el destinatario y asunto prellenados — los navegadores no permiten adjuntar archivos automáticamente por seguridad, así que deberás arrastrar el PDF recién descargado al correo antes de enviarlo.
-    </p>
-  </div>
-
   <!-- ================= COMMS TAB ================= -->
   <section id="tab-comms" class="panel">
+    <div class="ecopass-wrap" id="ecopassCard"></div>
+    <div class="chart-card" id="inscritosSeguimientoCard" style="margin:14px 32px 0; max-height:none;"></div>
+
     <div class="stat-row" id="commsStats"></div>
 
     <div class="toolbar">
@@ -291,6 +259,32 @@
 
   <!-- ================= INVITADOS TAB ================= -->
   <section id="tab-invitados" class="panel hidden">
+    <div class="chart-card" style="margin-bottom:14px; max-height:none;">
+      <div class="trend-title" style="margin-bottom:12px;">📜 Cartas Especiales — plantillas por tipo de destinatario</div>
+      <div class="carta-plantilla" data-tipo="autoridad">
+        <div class="carta-plantilla-header">
+          <strong>Autoridad</strong>
+          <button class="btn small secondary" data-action="toggle-edit-plantilla" data-tipo="autoridad">Editar</button>
+        </div>
+        <textarea class="carta-texto" id="plantillaTexto_autoridad" rows="6" disabled></textarea>
+      </div>
+      <div class="carta-plantilla" data-tipo="miembro">
+        <div class="carta-plantilla-header">
+          <strong>Miembro HL7</strong>
+          <button class="btn small secondary" data-action="toggle-edit-plantilla" data-tipo="miembro">Editar</button>
+        </div>
+        <textarea class="carta-texto" id="plantillaTexto_miembro" rows="6" disabled></textarea>
+      </div>
+      <div class="carta-plantilla" data-tipo="sponsor">
+        <div class="carta-plantilla-header">
+          <strong>Sponsor</strong>
+          <button class="btn small secondary" data-action="toggle-edit-plantilla" data-tipo="sponsor">Editar</button>
+        </div>
+        <textarea class="carta-texto" id="plantillaTexto_sponsor" rows="6" disabled></textarea>
+      </div>
+      <p class="section-note" style="margin-top:6px;">Este es el texto que se usa automáticamente al generar el PDF de cada invitado, según el tipo que le asignes abajo. Puedes editarlo aquí — los cambios se aplican a las cartas que generes desde ese momento.</p>
+    </div>
+
     <div class="stat-row" id="invitadosStats"></div>
 
     <div class="toolbar">
@@ -310,12 +304,16 @@
 
     <table>
       <thead><tr>
-        <th>Nombre</th><th>Apellido</th><th>Cargo</th><th>Empresa</th><th>Correo</th><th>Tipo</th><th>Carta enviada</th><th></th>
+        <th>Trato</th><th>Nombre</th><th>Apellido</th><th>Cargo</th><th>Empresa</th><th>Correo</th><th>Tipo</th><th>Carta enviada</th><th>Carta</th><th></th>
       </tr></thead>
       <tbody id="invitadosBody"></tbody>
     </table>
 
     <div class="pill-add">
+      <select id="newInvitadoTratamiento">
+        <option value="Estimado">Estimado</option>
+        <option value="Estimada">Estimada</option>
+      </select>
       <input type="text" id="newInvitadoNombre" placeholder="Nombre">
       <input type="text" id="newInvitadoApellido" placeholder="Apellido">
       <input type="text" id="newInvitadoCargo" placeholder="Cargo (opcional)">
@@ -329,6 +327,9 @@
       </select>
       <button class="btn" id="addInvitadoBtn">+ Agregar invitado</button>
     </div>
+    <p class="footer-note" style="margin-top:10px;">
+      Al agregar un invitado con su tipo asignado, la carta queda lista de inmediato: usa los botones "📄 PDF" y "✉ Correo" de su fila para descargarla o enviarla — no hace falta un paso de "generar carta" aparte. "Enviar a correo" descarga el PDF y abre tu cliente de correo con el destinatario y asunto prellenados — los navegadores no permiten adjuntar archivos automáticamente por seguridad, así que deberás arrastrar el PDF recién descargado al correo antes de enviarlo.
+    </p>
 
     <p class="footer-note">
       Registro de personas que deben recibir una Carta Especial (autoridades, miembros HL7 y sponsors). Marca la casilla "Carta enviada" una vez que confirmes el envío de la carta a esa persona. Esta tabla se guarda en Google Sheets, en una pestaña llamada "invitados".
@@ -873,11 +874,6 @@ setInterval(fetchLiveData, 5 * 60 * 1000); // re-sincroniza cada 5 minutos mient
 /* ===== FIN LIVE SYNC ===== */
 
 
-/*CARTAS_START*/
-const CARTAS_DATA = [];
-/*CARTAS_END*/
-let cartas = JSON.parse(JSON.stringify(CARTAS_DATA));
-let nextCartaId = Math.max(0, ...cartas.map(c=>c.id)) + 1;
 
 const CARTA_TEXTO_DEFAULT = `Junto con saludar, nos gustaría comentarle que HL7 Chile, en conjunto con el Ministerio de Salud de Chile, realizará el FHIR Connectathon HL7 Chile 2027.
 
@@ -1289,10 +1285,16 @@ function renderInvitados(){
   });
 
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(i => `
       <tr class="${i.enviada?'done-row':''}">
+        <td>
+          <select data-id="${i.id}" data-field="tratamiento">
+            <option value="Estimado" ${i.tratamiento==='Estimada'?'':'selected'}>Estimado</option>
+            <option value="Estimada" ${i.tratamiento==='Estimada'?'selected':''}>Estimada</option>
+          </select>
+        </td>
         <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.nombre)}" data-id="${i.id}" data-field="nombre"></td>
         <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.apellido)}" data-id="${i.id}" data-field="apellido"></td>
         <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.cargo)}" data-id="${i.id}" data-field="cargo"></td>
@@ -1307,6 +1309,10 @@ function renderInvitados(){
           </select>
         </td>
         <td style="text-align:center;"><input type="checkbox" class="row-check" ${i.enviada?'checked':''} data-id="${i.id}" data-field="enviada"></td>
+        <td class="carta-actions">
+          <button class="btn small secondary" data-id="${i.id}" data-action="dlInvitadoCarta">📄 PDF</button>
+          <button class="btn small secondary" data-id="${i.id}" data-action="mailInvitadoCarta">✉ Correo</button>
+        </td>
         <td><button class="btn small secondary" data-id="${i.id}" data-action="delInvitado">✕</button></td>
       </tr>
     `).join('');
@@ -1326,6 +1332,10 @@ function renderInvitados(){
         refreshInvitados();
         setLiveSyncStatus('🟢 Invitado eliminado en Google Sheets', true);
       });
+    } else if(el.dataset.action==='dlInvitadoCarta'){
+      el.addEventListener('click', ()=> downloadInvitadoCarta(Number(el.dataset.id)));
+    } else if(el.dataset.action==='mailInvitadoCarta'){
+      el.addEventListener('click', ()=> emailInvitadoCarta(Number(el.dataset.id)));
     }
   });
 }
@@ -1352,6 +1362,7 @@ document.getElementById('invitadosEstadoFilter').addEventListener('change', rend
 document.getElementById('invitadosSearch').addEventListener('input', renderInvitados);
 
 document.getElementById('addInvitadoBtn').addEventListener('click', async ()=>{
+  const tratamiento = document.getElementById('newInvitadoTratamiento').value;
   const nombre = document.getElementById('newInvitadoNombre').value.trim();
   const apellido = document.getElementById('newInvitadoApellido').value.trim();
   const cargo = document.getElementById('newInvitadoCargo').value.trim();
@@ -1362,7 +1373,7 @@ document.getElementById('addInvitadoBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('addInvitadoBtn');
   const originalLabel = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
-  const newItem = { nombre, apellido, cargo, empresa, email, tipo, enviada:false };
+  const newItem = { tratamiento, nombre, apellido, cargo, empresa, email, tipo, enviada:false };
   const newId = await appendRowToSheet('invitados', newItem);
   btn.disabled = false; btn.textContent = originalLabel;
   if(newId === null){
@@ -1386,7 +1397,7 @@ refreshInvitados();
 
 // ================= Export / Import (no localStorage allowed) =================
 function exportAll(){
-  const payload = { comms, ops, cartas, invitados, exportedAt: new Date().toISOString() };
+  const payload = { comms, ops, invitados, plantillas: CARTA_TEXTOS_POR_TIPO, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 1)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1404,13 +1415,15 @@ function handleImport(file){
       const payload = JSON.parse(e.target.result);
       if(payload.comms) comms = payload.comms;
       if(payload.ops) ops = payload.ops;
-      if(payload.cartas) cartas = payload.cartas;
       if(payload.invitados) invitados = payload.invitados;
+      if(payload.plantillas){
+        Object.assign(CARTA_TEXTOS_POR_TIPO, payload.plantillas);
+        cargarPlantillasEnPantalla();
+      }
       nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
       nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
-      nextCartaId = Math.max(0, ...cartas.map(c=>c.id)) + 1;
       nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
-      refreshComms(); refreshOps(); renderCartas(); refreshInvitados();
+      refreshComms(); refreshOps(); refreshInvitados();
       alert('Datos importados correctamente.');
     }catch(err){ alert('No se pudo leer el archivo: ' + err.message); }
   };
@@ -1550,85 +1563,75 @@ function cartaFileName(carta){
   return `Carta_${safe}.pdf`;
 }
 
-function downloadCarta(id){
-  const carta = cartas.find(c=>c.id===id);
-  if(!carta) return;
+/**
+ * Construye el objeto "carta" (para buildCartaDoc) a partir de un invitado registrado.
+ * La ciudad de emisión queda fija en Valparaíso (igual que la plantilla original) y la
+ * fecha de emisión es siempre la fecha en que se genera el PDF (hoy), no la fecha de alta
+ * del invitado.
+ */
+function invitadoToCarta(inv){
+  return {
+    tratamiento: inv.tratamiento || 'Estimado',
+    nombre: [inv.nombre, inv.apellido].filter(Boolean).join(' '),
+    cargo: inv.cargo || '',
+    organizacion: inv.empresa || '',
+    ciudad: 'Valparaíso',
+    fechaEmision: new Date().toISOString().slice(0,10),
+    texto: (inv.tipo && CARTA_TEXTOS_POR_TIPO[inv.tipo]) ? CARTA_TEXTOS_POR_TIPO[inv.tipo] : CARTA_TEXTO_DEFAULT
+  };
+}
+
+function downloadInvitadoCarta(id){
+  const inv = invitados.find(i=>i.id===id);
+  if(!inv) return;
+  if(!inv.tipo){ alert('Asigna primero un tipo (Autoridad / Miembro HL7 / Sponsor) a este invitado para generar su carta.'); return; }
+  const carta = invitadoToCarta(inv);
   const doc = buildCartaDoc(carta);
   doc.save(cartaFileName(carta));
 }
 
-function emailCarta(id){
-  const carta = cartas.find(c=>c.id===id);
-  if(!carta) return;
-  downloadCarta(id);
+function emailInvitadoCarta(id){
+  const inv = invitados.find(i=>i.id===id);
+  if(!inv) return;
+  if(!inv.tipo){ alert('Asigna primero un tipo (Autoridad / Miembro HL7 / Sponsor) a este invitado para generar su carta.'); return; }
+  downloadInvitadoCarta(id);
+  const carta = invitadoToCarta(inv);
   const subject = encodeURIComponent(`Invitación FHIR Connectathon HL7 Chile 2027 — ${carta.nombre}`);
   const body = encodeURIComponent(`Estimado/a,\n\nAdjunto encontrará la carta de invitación al FHIR Connectathon HL7 Chile 2027.\n\n(Recuerda adjuntar manualmente el PDF "${cartaFileName(carta)}" que se acaba de descargar — los navegadores no permiten adjuntarlo automáticamente por seguridad.)\n\nSaludos cordiales,\nHL7 Chile`);
-  window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+  const destinatario = inv.email ? encodeURIComponent(inv.email) : '';
+  window.open(`mailto:${destinatario}?subject=${subject}&body=${body}`, '_blank');
 }
 
-function renderCartas(){
-  const tbody = document.getElementById('cartasBody');
-  if(!cartas.length){
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text-dim); text-align:center; padding:16px;">Aún no hay cartas generadas.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = cartas.map(c => `
-    <tr>
-      <td>${escapeHtml(c.tratamiento)} ${escapeHtml(c.nombre)}</td>
-      <td>${escapeHtml([c.cargo, c.organizacion].filter(Boolean).join(' — ') || '—')}</td>
-      <td class="periodo">${formatCartaFecha(c.fechaEmision)}</td>
-      <td class="periodo">${c.fechaCreacion}</td>
-      <td class="carta-actions">
-        <button class="btn small secondary" data-action="dl" data-id="${c.id}">📄 Descargar PDF</button>
-        <button class="btn small secondary" data-action="mail" data-id="${c.id}">✉ Enviar a correo</button>
-        <button class="btn small secondary" data-action="del" data-id="${c.id}">✕</button>
-      </td>
-    </tr>
-  `).join('');
-  tbody.querySelectorAll('button').forEach(btn=>{
-    const id = Number(btn.dataset.id);
-    if(btn.dataset.action==='dl') btn.addEventListener('click', ()=>downloadCarta(id));
-    if(btn.dataset.action==='mail') btn.addEventListener('click', ()=>emailCarta(id));
-    if(btn.dataset.action==='del') btn.addEventListener('click', ()=>{ cartas = cartas.filter(c=>c.id!==id); renderCartas(); });
+/* ===== Plantillas de Cartas Especiales (editables por tipo) ===== */
+function cargarPlantillasEnPantalla(){
+  ['autoridad','miembro','sponsor'].forEach(tipo=>{
+    document.getElementById('plantillaTexto_' + tipo).value = CARTA_TEXTOS_POR_TIPO[tipo];
   });
 }
 
-document.getElementById('generarCartaBtn').addEventListener('click', ()=>{
-  const nombre = document.getElementById('cartaNombre').value.trim();
-  const fechaEmision = document.getElementById('cartaFecha').value;
-  if(!nombre){ alert('Escribe el nombre del destinatario.'); return; }
-  if(!fechaEmision){ alert('Selecciona la fecha de emisión.'); return; }
-  const carta = {
-    id: nextCartaId++,
-    tratamiento: document.getElementById('cartaTratamiento').value,
-    nombre,
-    cargo: document.getElementById('cartaCargo').value.trim(),
-    organizacion: document.getElementById('cartaOrganizacion').value.trim(),
-    ciudad: document.getElementById('cartaCiudad').value.trim() || 'Valparaíso',
-    fechaEmision,
-    texto: document.getElementById('cartaTexto').value,
-    fechaCreacion: new Date().toISOString().slice(0,10)
-  };
-  cartas.push(carta);
-  renderCartas();
-  document.getElementById('cartaNombre').value = '';
-  document.getElementById('cartaCargo').value = '';
-  document.getElementById('cartaOrganizacion').value = '';
-});
-
-document.getElementById('cartaTipoDestinatario').addEventListener('change', (e)=>{
-  const tipo = e.target.value;
-  document.getElementById('cartaTexto').value = CARTA_TEXTOS_POR_TIPO[tipo] || CARTA_TEXTO_DEFAULT;
+document.querySelectorAll('[data-action="toggle-edit-plantilla"]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const tipo = btn.dataset.tipo;
+    const textarea = document.getElementById('plantillaTexto_' + tipo);
+    const editando = !textarea.disabled;
+    if(editando){
+      CARTA_TEXTOS_POR_TIPO[tipo] = textarea.value;
+      textarea.disabled = true;
+      btn.textContent = 'Editar';
+    } else {
+      textarea.disabled = false;
+      textarea.focus();
+      btn.textContent = 'Guardar';
+    }
+  });
 });
 
 // init
-document.getElementById('cartaTexto').value = CARTA_TEXTO_DEFAULT;
-document.getElementById('cartaFecha').valueAsDate = new Date();
+cargarPlantillasEnPantalla();
 refreshComms();
 refreshOps();
 renderEcopass();
 renderInscritosSeguimiento();
-renderCartas();
 </script>
 </body>
 </html>
