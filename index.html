@@ -1486,7 +1486,7 @@ function renderTaller1(){
         <div class="stat-label">Total inscritos</div>
       </div>
     </div>
-    <p class="footer-note" style="margin-top:6px;">Verificado manualmente el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos (nombre, correo, teléfono), aquí solo se muestra el total agregado — nunca el listado individual.</p>
+    <p class="footer-note" style="margin-top:6px;">${TALLER1_ONLINE.fuente === 'Google Sheets (automático)' ? 'Actualizado automáticamente' : 'Verificado manualmente'} el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos (nombre, correo, teléfono), aquí solo se muestra el total agregado — nunca el listado individual.</p>
   `;
 }
 
