@@ -785,6 +785,12 @@ async function fetchLiveData(){
       ECOPASS_TICKETS = data.ecopass.tickets;
       renderEcopass();
     }
+    if(data.taller1 && typeof data.taller1.total === 'number'){
+      TALLER1_ONLINE.total = data.taller1.total;
+      TALLER1_ONLINE.verificado = data.taller1.ts || TALLER1_ONLINE.verificado;
+      TALLER1_ONLINE.fuente = 'Google Sheets (automático)';
+      renderTaller1();
+    }
     const now = new Date();
     const hh = String(now.getHours()).padStart(2,'0');
     const mm = String(now.getMinutes()).padStart(2,'0');
