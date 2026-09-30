@@ -174,7 +174,7 @@
   <!-- ================= COMMS TAB ================= -->
   <section id="tab-comms" class="panel">
     <div class="ecopass-wrap" id="ecopassCard"></div>
-    <div class="chart-card" id="inscritosSeguimientoCard" style="margin:14px 32px 0; max-height:none;"></div>
+    <div class="chart-card" id="taller1Card" style="margin:14px 32px 0; max-height:none;"></div>
 
     <div class="stat-row" id="commsStats"></div>
 
@@ -730,12 +730,16 @@ let ECOPASS_TICKETS = [
 ];
 /*ECOPASS_TICKETS_END*/
 
-/*ECOPASS_HISTORY_START*/
-let ECOPASS_HISTORY = {
-  "Primer día": [{"fecha":"2026-08-19","inscritos":0,"aforo":0,"estado":"Disponible"}],
-  "2do y 3er día": [{"fecha":"2026-08-19","inscritos":0,"aforo":0,"estado":"Disponible"}]
+/*TALLER1_START*/
+// Snapshot manual (no se expone la planilla completa por privacidad: contiene nombre, correo y teléfono
+// de cada inscrito). Fuente: "TALLER 01 RUMBO A LA CONNECTATHON (respuestas)" (Google Forms).
+// Actualizar "total" a mano cada vez que se revise la planilla.
+const TALLER1_ONLINE = {
+  total: 100,
+  verificado: '2026-09-30',
+  fuente: 'Google Forms — Taller 1 Online rumbo a la Connectathon'
 };
-/*ECOPASS_HISTORY_END*/
+/*TALLER1_END*/
 
 let comms = JSON.parse(JSON.stringify(COMMS_DATA));
 let ops = JSON.parse(JSON.stringify(OPS_DATA));
@@ -779,11 +783,7 @@ async function fetchLiveData(){
     }
     if(data.ecopass && data.ecopass.tickets && data.ecopass.tickets.length){
       ECOPASS_TICKETS = data.ecopass.tickets;
-      if(data.ecopass.history){
-        ECOPASS_HISTORY = data.ecopass.history;
-      }
       renderEcopass();
-      renderInscritosSeguimiento();
     }
     const now = new Date();
     const hh = String(now.getHours()).padStart(2,'0');
@@ -1467,45 +1467,20 @@ function renderEcopass(){
   container.innerHTML = cardsHtml;
 }
 
-function renderInscritosSeguimiento(){
-  const container = document.getElementById('inscritosSeguimientoCard');
-  const tipos = Object.keys(ECOPASS_HISTORY || {});
-  if(!tipos.length){ container.innerHTML = ''; return; }
-  const blocksHtml = tipos.map(tipo => {
-    const hist = [...(ECOPASS_HISTORY[tipo]||[])].sort((a,b)=> a.fecha.localeCompare(b.fecha));
-    if(!hist.length) return '';
-    const first = hist[0], last = hist[hist.length-1];
-    const totalDelta = last.inscritos - first.inscritos;
-    const maxIns = Math.max(1, ...hist.map(h=>h.inscritos));
-    const rowsHtml = hist.map((h,i)=>{
-      const prev = i>0 ? hist[i-1].inscritos : h.inscritos;
-      const delta = h.inscritos - prev;
-      const pct = Math.round((h.inscritos/maxIns)*100);
-      const deltaCls = delta>0 ? 'up' : 'zero';
-      const deltaTxt = i===0 ? '—' : (delta>0? '+'+delta : '0');
-      return `
-        <div class="trend-row">
-          <div class="t-date">${h.fecha}</div>
-          <div class="bar-track"><div class="bar-fill inscritos" style="width:${pct}%"></div></div>
-          <div class="t-delta ${deltaCls}">${h.inscritos}</div>
-          <div class="t-estado">${escapeHtml(h.estado||'')} · ${deltaTxt}</div>
-        </div>`;
-    }).join('');
-    return `
-      <div class="trend-header">
-        <div class="trend-title">📈 ${escapeHtml(tipo)}</div>
-        <div class="trend-stats">
-          <span>Desde <b>${first.fecha}</b>: <b>${first.inscritos}</b> → <b>${last.inscritos}</b> (${totalDelta>=0?'+':''}${totalDelta})</span>
-          <span>Aforo objetivo: <b>${last.aforo || '—'}</b></span>
-        </div>
-      </div>
-      ${rowsHtml}
-    `;
-  }).join('<div style="height:16px;"></div>');
+function renderTaller1(){
+  const container = document.getElementById('taller1Card');
+  if(!TALLER1_ONLINE || !container){ if(container) container.innerHTML=''; return; }
+  let ts = TALLER1_ONLINE.verificado;
+  try{ ts = new Date(TALLER1_ONLINE.verificado).toLocaleDateString('es-CL', {dateStyle:'medium'}); }catch(e){}
   container.innerHTML = `
-    <div class="trend-title" style="margin-bottom:8px;">📈 Seguimiento de personas inscritas (Ecopass)</div>
-    ${blocksHtml}
-    <p class="footer-note" style="margin-top:10px;">Cada fila es una verificación real contra Ecopass (registrada manualmente en el Sheet). No se interpolan ni estiman valores entre verificaciones.</p>
+    <div class="trend-title" style="margin-bottom:8px;">🧑‍💻 Taller 1 Online — rumbo a la Connectathon</div>
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card">
+        <div class="stat-value">${Number(TALLER1_ONLINE.total).toLocaleString('es-CL')}</div>
+        <div class="stat-label">Total inscritos</div>
+      </div>
+    </div>
+    <p class="footer-note" style="margin-top:6px;">Verificado manualmente el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos (nombre, correo, teléfono), aquí solo se muestra el total agregado — nunca el listado individual.</p>
   `;
 }
 
@@ -1631,7 +1606,7 @@ cargarPlantillasEnPantalla();
 refreshComms();
 refreshOps();
 renderEcopass();
-renderInscritosSeguimiento();
+renderTaller1();
 </script>
 </body>
 </html>
