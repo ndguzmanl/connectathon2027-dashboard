@@ -164,6 +164,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="comms">📣 Estrategia de Comunicación</button>
   <button class="tab-btn" data-tab="ops">✅ Acciones de Operaciones</button>
+  <button class="tab-btn" data-tab="invitados">👥 Lista de Invitados</button>
 </div>
 
 <main>
@@ -285,6 +286,52 @@
 
     <p class="footer-note">
       Checklist extraído de "lista de acciones.xlsx". Nota: el archivo original salta de la sección 4 a la 6 (no existe una sección "5" en el archivo fuente) — se conserva así para no inventar contenido. Las secciones "Prensa y medios" y "Experiencia del participante" no estaban numeradas en el archivo original; se numeraron aquí solo para ordenar la vista.
+    </p>
+  </section>
+
+  <!-- ================= INVITADOS TAB ================= -->
+  <section id="tab-invitados" class="panel hidden">
+    <div class="stat-row" id="invitadosStats"></div>
+
+    <div class="toolbar">
+      <select id="invitadosTipoFilter">
+        <option value="">Todos los tipos</option>
+        <option value="autoridad">Autoridad</option>
+        <option value="miembro">Miembro HL7</option>
+        <option value="sponsor">Sponsor</option>
+      </select>
+      <select id="invitadosEstadoFilter">
+        <option value="">Todos los estados</option>
+        <option value="enviada">Carta enviada</option>
+        <option value="pendiente">Pendiente de envío</option>
+      </select>
+      <input type="text" id="invitadosSearch" placeholder="Buscar nombre, empresa o correo...">
+    </div>
+
+    <table>
+      <thead><tr>
+        <th>Nombre</th><th>Apellido</th><th>Cargo</th><th>Empresa</th><th>Correo</th><th>Tipo</th><th>Carta enviada</th><th></th>
+      </tr></thead>
+      <tbody id="invitadosBody"></tbody>
+    </table>
+
+    <div class="pill-add">
+      <input type="text" id="newInvitadoNombre" placeholder="Nombre">
+      <input type="text" id="newInvitadoApellido" placeholder="Apellido">
+      <input type="text" id="newInvitadoCargo" placeholder="Cargo (opcional)">
+      <input type="text" id="newInvitadoEmpresa" placeholder="Empresa (opcional)">
+      <input type="email" id="newInvitadoEmail" placeholder="Correo electrónico">
+      <select id="newInvitadoTipo">
+        <option value="">Tipo…</option>
+        <option value="autoridad">Autoridad</option>
+        <option value="miembro">Miembro HL7</option>
+        <option value="sponsor">Sponsor</option>
+      </select>
+      <button class="btn" id="addInvitadoBtn">+ Agregar invitado</button>
+    </div>
+
+    <p class="footer-note">
+      Registro de personas que deben recibir una Carta Especial (autoridades, miembros HL7 y sponsors). Marca la casilla "Carta enviada" una vez que confirmes el envío de la carta a esa persona. Esta tabla se guarda en Google Sheets, en una pestaña llamada "invitados".
     </p>
   </section>
 </main>
@@ -694,6 +741,9 @@ let ops = JSON.parse(JSON.stringify(OPS_DATA));
 let nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
 let nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
 
+let invitados = [];
+let nextInvitadosId = 1;
+
 
 /* ===== LIVE SYNC vía Apps Script API (lectura y escritura en Google Sheets) ===== */
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzIcjM3GI9r1kCOuaukGVeyU3hVuS96Q4bX1862Kk0b8-yvojhuY366ILKsZ3D7215J/exec';
@@ -720,6 +770,11 @@ async function fetchLiveData(){
       ops = data.operaciones;
       nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
       refreshOps();
+    }
+    if(data.invitados && data.invitados.length){
+      invitados = data.invitados;
+      nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
+      refreshInvitados();
     }
     if(data.ecopass && data.ecopass.tickets && data.ecopass.tickets.length){
       ECOPASS_TICKETS = data.ecopass.tickets;
@@ -869,6 +924,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('tab-comms').classList.toggle('hidden', btn.dataset.tab!=='comms');
     document.getElementById('tab-ops').classList.toggle('hidden', btn.dataset.tab!=='ops');
+    document.getElementById('tab-invitados').classList.toggle('hidden', btn.dataset.tab!=='invitados');
   });
 });
 
@@ -1184,9 +1240,153 @@ document.getElementById('addOpsBtn').addEventListener('click', async ()=>{
   setLiveSyncStatus('🟢 Acción guardada en Google Sheets', true);
 });
 
+/* ===== Lista de Invitados (Cartas Especiales) ===== */
+
+const INVITADO_TIPO_LABEL = { autoridad:'Autoridad', miembro:'Miembro HL7', sponsor:'Sponsor' };
+
+function renderInvitadosStats(){
+  const total = invitados.length;
+  const enviadas = invitados.filter(i=>i.enviada).length;
+  const pct = total ? Math.round(enviadas/total*100) : 0;
+  const porTipo = { autoridad:0, miembro:0, sponsor:0 };
+  invitados.forEach(i=>{ if(porTipo[i.tipo]!==undefined) porTipo[i.tipo]++; });
+  document.getElementById('invitadosStats').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Invitados totales</div>
+      <div class="value">${total}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Cartas enviadas</div>
+      <div class="value">${enviadas} / ${total}</div>
+      <div class="progress-bar"><div style="width:${pct}%"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Autoridades</div>
+      <div class="value">${porTipo.autoridad}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Miembros HL7 / Sponsors</div>
+      <div class="value">${porTipo.miembro} / ${porTipo.sponsor}</div>
+    </div>
+  `;
+}
+
+function renderInvitados(){
+  const tipoF = document.getElementById('invitadosTipoFilter').value;
+  const estadoF = document.getElementById('invitadosEstadoFilter').value;
+  const q = document.getElementById('invitadosSearch').value.toLowerCase();
+  const tbody = document.getElementById('invitadosBody');
+
+  const filtered = invitados.filter(i=>{
+    if(tipoF && i.tipo!==tipoF) return false;
+    if(estadoF==='enviada' && !i.enviada) return false;
+    if(estadoF==='pendiente' && i.enviada) return false;
+    if(q){
+      const hay = [i.nombre, i.apellido, i.empresa, i.email, i.cargo].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
+  } else {
+    tbody.innerHTML = filtered.map(i => `
+      <tr class="${i.enviada?'done-row':''}">
+        <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.nombre)}" data-id="${i.id}" data-field="nombre"></td>
+        <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.apellido)}" data-id="${i.id}" data-field="apellido"></td>
+        <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.cargo)}" data-id="${i.id}" data-field="cargo"></td>
+        <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(i.empresa)}" data-id="${i.id}" data-field="empresa"></td>
+        <td><input class="mini" type="email" placeholder="—" value="${escapeHtml(i.email)}" data-id="${i.id}" data-field="email"></td>
+        <td>
+          <select data-id="${i.id}" data-field="tipo">
+            <option value="" ${!i.tipo?'selected':''}>—</option>
+            <option value="autoridad" ${i.tipo==='autoridad'?'selected':''}>Autoridad</option>
+            <option value="miembro" ${i.tipo==='miembro'?'selected':''}>Miembro HL7</option>
+            <option value="sponsor" ${i.tipo==='sponsor'?'selected':''}>Sponsor</option>
+          </select>
+        </td>
+        <td style="text-align:center;"><input type="checkbox" class="row-check" ${i.enviada?'checked':''} data-id="${i.id}" data-field="enviada"></td>
+        <td><button class="btn small secondary" data-id="${i.id}" data-action="delInvitado">✕</button></td>
+      </tr>
+    `).join('');
+  }
+
+  tbody.querySelectorAll('input,select,button').forEach(el=>{
+    if(el.dataset.field){
+      el.addEventListener('change', onInvitadoFieldChange);
+    } else if(el.dataset.action==='delInvitado'){
+      el.addEventListener('click', async ()=>{
+        const id = Number(el.dataset.id);
+        el.disabled = true;
+        const ok = await deleteRowFromSheet('invitados', id);
+        el.disabled = false;
+        if(!ok){ alert('No se pudo eliminar el invitado en Google Sheets. Intenta de nuevo.'); return; }
+        invitados = invitados.filter(i=>i.id!=id);
+        refreshInvitados();
+        setLiveSyncStatus('🟢 Invitado eliminado en Google Sheets', true);
+      });
+    }
+  });
+}
+
+async function onInvitadoFieldChange(e){
+  const id = Number(e.target.dataset.id);
+  const field = e.target.dataset.field;
+  const item = invitados.find(i=>i.id===id);
+  if(!item) return;
+  let apiValue;
+  if(field==='enviada'){ item.enviada = e.target.checked; apiValue = e.target.checked; }
+  else { item[field] = e.target.value; apiValue = e.target.value; }
+  renderInvitadosStats();
+  renderInvitados();
+  const ok = await writeFieldToSheet('invitados', id, field, apiValue);
+  flashSaveState(e.target, ok);
+  if(ok){ setLiveSyncStatus('🟢 Guardado correctamente en Google Sheets', true); }
+}
+
+function refreshInvitados(){ renderInvitadosStats(); renderInvitados(); }
+
+document.getElementById('invitadosTipoFilter').addEventListener('change', renderInvitados);
+document.getElementById('invitadosEstadoFilter').addEventListener('change', renderInvitados);
+document.getElementById('invitadosSearch').addEventListener('input', renderInvitados);
+
+document.getElementById('addInvitadoBtn').addEventListener('click', async ()=>{
+  const nombre = document.getElementById('newInvitadoNombre').value.trim();
+  const apellido = document.getElementById('newInvitadoApellido').value.trim();
+  const cargo = document.getElementById('newInvitadoCargo').value.trim();
+  const empresa = document.getElementById('newInvitadoEmpresa').value.trim();
+  const email = document.getElementById('newInvitadoEmail').value.trim();
+  const tipo = document.getElementById('newInvitadoTipo').value;
+  if(!nombre){ alert('Escribe al menos el nombre del invitado.'); return; }
+  const btn = document.getElementById('addInvitadoBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  const newItem = { nombre, apellido, cargo, empresa, email, tipo, enviada:false };
+  const newId = await appendRowToSheet('invitados', newItem);
+  btn.disabled = false; btn.textContent = originalLabel;
+  if(newId === null){
+    alert('No se pudo guardar el invitado en Google Sheets. Revisa tu conexión e intenta de nuevo.');
+    return;
+  }
+  newItem.id = newId;
+  invitados.push(newItem);
+  nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
+  document.getElementById('newInvitadoNombre').value = '';
+  document.getElementById('newInvitadoApellido').value = '';
+  document.getElementById('newInvitadoCargo').value = '';
+  document.getElementById('newInvitadoEmpresa').value = '';
+  document.getElementById('newInvitadoEmail').value = '';
+  document.getElementById('newInvitadoTipo').value = '';
+  refreshInvitados();
+  setLiveSyncStatus('🟢 Invitado guardado en Google Sheets', true);
+});
+
+refreshInvitados();
+
 // ================= Export / Import (no localStorage allowed) =================
 function exportAll(){
-  const payload = { comms, ops, cartas, exportedAt: new Date().toISOString() };
+  const payload = { comms, ops, cartas, invitados, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 1)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1205,10 +1405,12 @@ function handleImport(file){
       if(payload.comms) comms = payload.comms;
       if(payload.ops) ops = payload.ops;
       if(payload.cartas) cartas = payload.cartas;
+      if(payload.invitados) invitados = payload.invitados;
       nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
       nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
       nextCartaId = Math.max(0, ...cartas.map(c=>c.id)) + 1;
-      refreshComms(); refreshOps(); renderCartas();
+      nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
+      refreshComms(); refreshOps(); renderCartas(); refreshInvitados();
       alert('Datos importados correctamente.');
     }catch(err){ alert('No se pudo leer el archivo: ' + err.message); }
   };
