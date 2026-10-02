@@ -133,6 +133,13 @@
   }
   .ep-cta.enabled{background:var(--ok); color:#08172c;}
   .ep-cta.disabled{background:#0d1526; color:var(--text-dim); border:1px dashed var(--border); cursor:not-allowed; pointer-events:none;}
+  .ep-tracks{width:100%; margin-top:6px; padding-top:10px; border-top:1px dashed var(--border); display:flex; flex-direction:column; gap:8px;}
+  .ep-tracks-title{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px;}
+  .ep-track-row{display:grid; grid-template-columns:1fr 100px; gap:4px 8px; align-items:center;}
+  .ep-track-row .et-label{font-size:12px; color:var(--text);}
+  .ep-track-row .et-val{font-size:12px; font-weight:700; text-align:right; color:var(--text-dim);}
+  .ep-track-bar{grid-column:1 / -1; background:#0d1526; border-radius:5px; height:7px; overflow:hidden;}
+  .ep-track-bar > div{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2));}
   .trend-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px;}
   .trend-title{font-size:13px; font-weight:700;}
   .trend-stats{display:flex; gap:18px; font-size:12px; color:var(--text-dim);}
@@ -789,7 +796,6 @@ async function fetchLiveData(){
       TALLER1_ONLINE.total = data.taller1.total;
       TALLER1_ONLINE.verificado = data.taller1.ts || TALLER1_ONLINE.verificado;
       TALLER1_ONLINE.fuente = 'Google Sheets (automático)';
-      TALLER1_ONLINE.correos = (data.taller1.correos && typeof data.taller1.correos.enviados === 'number') ? data.taller1.correos : null;
       renderTaller1();
     }
     const now = new Date();
@@ -1447,18 +1453,36 @@ function escapeHtml(s){
 function renderEcopass(){
   const container = document.getElementById('ecopassCard');
   if(!ECOPASS_TICKETS || !ECOPASS_TICKETS.length){ container.innerHTML = ''; return; }
-  const cardsHtml = ECOPASS_TICKETS.map(p => {
+
+  // Una fila "Tipo — Nombre del track" se trata como desglose por track de "Tipo".
+  // Si no hay filas de ese tipo todavía, el tipo se sigue mostrando como tarjeta simple (sin romper nada).
+  const trackEntries = [];
+  const simpleEntries = [];
+  ECOPASS_TICKETS.forEach(p=>{
+    const sepIdx = (p.tipoEntrada || '').indexOf(' — ');
+    if(sepIdx > -1){
+      trackEntries.push({ parent: p.tipoEntrada.slice(0, sepIdx), track: p.tipoEntrada.slice(sepIdx + 3), data: p });
+    } else {
+      simpleEntries.push(p);
+    }
+  });
+  const trackParents = [...new Set(trackEntries.map(t => t.parent))];
+
+  function ctaFor(ref){
+    const estadoNorm = (ref.estado || '').trim().toLowerCase();
+    const agotado = estadoNorm === 'agotado';
+    const oculto = estadoNorm === 'oculto momentáneamente' || estadoNorm === 'oculto' || estadoNorm === 'oculto momentaneamente';
+    return oculto
+      ? `<span class="ep-cta disabled">🕓 Aún no disponible</span>`
+      : (!agotado
+        ? `<a class="ep-cta enabled" href="${ref.linkCompra}" target="_blank" rel="noopener">🎟 Comprar tickets ↗</a>`
+        : `<span class="ep-cta disabled">🎟 Entradas agotadas</span>`);
+  }
+
+  function renderSimpleCard(p){
     const pct = p.aforo ? Math.round((p.inscritos/p.aforo)*100) : null;
     let ts = p.verificado;
     try{ ts = new Date(p.verificado).toLocaleString('es-CL', {dateStyle:'medium', timeStyle:'short'}); }catch(e){}
-    const estadoNorm = (p.estado || '').trim().toLowerCase();
-    const agotado = estadoNorm === 'agotado';
-    const oculto = estadoNorm === 'oculto momentáneamente' || estadoNorm === 'oculto' || estadoNorm === 'oculto momentaneamente';
-    const cta = oculto
-      ? `<span class="ep-cta disabled">🕓 Aún no disponible</span>`
-      : (!agotado
-        ? `<a class="ep-cta enabled" href="${p.linkCompra}" target="_blank" rel="noopener">🎟 Comprar tickets ↗</a>`
-        : `<span class="ep-cta disabled">🎟 Entradas agotadas</span>`);
     const aforoTxt = p.aforo ? `${p.inscritos} / ${p.aforo} (${pct}%)` : `${p.inscritos} (aforo por confirmar)`;
     return `
       <div class="ecopass-card">
@@ -1467,10 +1491,61 @@ function renderEcopass(){
         <div class="ep-metric"><span class="k">Inscritos / Aforo</span><span class="v">${aforoTxt}</span></div>
         <div class="ep-metric"><span class="k">Venta web</span><span class="v">$${Number(p.ventaWeb).toLocaleString('es-CL')}</span></div>
         <div class="ep-metric"><span class="k">Precio ticket</span><span class="v">${p.precio===0? 'Gratuito':'$'+Number(p.precio).toLocaleString('es-CL')}</span></div>
-        ${cta}
+        ${ctaFor(p)}
         <div class="ep-ts">Verificado: ${ts} · <a href="${p.fuente}" target="_blank" rel="noopener">ver en Ecopass ↗</a></div>
       </div>`;
-  }).join('');
+  }
+
+  function renderGroupedCard(parentName, aggregate, tracks){
+    const totalInscritos = aggregate ? Number(aggregate.inscritos) : tracks.reduce((s,t)=>s+(Number(t.data.inscritos)||0),0);
+    const totalAforo = aggregate ? Number(aggregate.aforo) : tracks.reduce((s,t)=>s+(Number(t.data.aforo)||0),0);
+    const pct = totalAforo ? Math.round((totalInscritos/totalAforo)*100) : null;
+    const ref = aggregate || tracks[0].data;
+    let ts = ref.verificado;
+    try{ ts = new Date(ref.verificado).toLocaleString('es-CL', {dateStyle:'medium', timeStyle:'short'}); }catch(e){}
+    const aforoTxt = totalAforo ? `${totalInscritos} / ${totalAforo} (${pct}%)` : `${totalInscritos} (aforo por confirmar)`;
+    const ventaWebTotal = aggregate ? Number(aggregate.ventaWeb) : tracks.reduce((s,t)=>s+(Number(t.data.ventaWeb)||0),0);
+
+    const tracksHtml = tracks.map(t=>{
+      const d = t.data;
+      const dAforo = Number(d.aforo) || 0;
+      const dInscritos = Number(d.inscritos) || 0;
+      const tpct = dAforo ? Math.round((dInscritos/dAforo)*100) : 0;
+      return `
+        <div class="ep-track-row">
+          <div class="et-label">${escapeHtml(t.track)}</div>
+          <div class="et-val">${dInscritos} / ${dAforo || '—'}${dAforo ? ` (${tpct}%)` : ''}</div>
+          <div class="ep-track-bar"><div style="width:${dAforo ? tpct : 0}%"></div></div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="ecopass-card">
+        <div class="ep-title"><span class="ep-logo"></span> Ecopass — ${escapeHtml(parentName)}</div>
+        <div class="ep-metric"><span class="k">Estado</span><span class="v">${escapeHtml(ref.estado)}</span></div>
+        <div class="ep-metric"><span class="k">Inscritos totales / Aforo</span><span class="v">${aforoTxt}</span></div>
+        <div class="ep-metric"><span class="k">Venta web</span><span class="v">$${Number(ventaWebTotal||0).toLocaleString('es-CL')}</span></div>
+        <div class="ep-metric"><span class="k">Precio ticket</span><span class="v">${ref.precio===0? 'Gratuito':'$'+Number(ref.precio).toLocaleString('es-CL')}</span></div>
+        ${ctaFor(ref)}
+        <div class="ep-tracks">
+          <div class="ep-tracks-title">Inscritos por track (${tracks.length})</div>
+          ${tracksHtml}
+        </div>
+        <div class="ep-ts">Verificado: ${ts} · <a href="${ref.fuente}" target="_blank" rel="noopener">ver en Ecopass ↗</a></div>
+      </div>`;
+  }
+
+  let cardsHtml = '';
+  simpleEntries.forEach(p=>{
+    if(trackParents.includes(p.tipoEntrada)) return; // se renderiza junto a su desglose más abajo
+    cardsHtml += renderSimpleCard(p);
+  });
+  trackParents.forEach(parentName=>{
+    const aggregate = simpleEntries.find(p=>p.tipoEntrada === parentName) || null;
+    const tracks = trackEntries.filter(t=>t.parent === parentName);
+    cardsHtml += renderGroupedCard(parentName, aggregate, tracks);
+  });
+
   container.innerHTML = cardsHtml;
 }
 
@@ -1479,19 +1554,6 @@ function renderTaller1(){
   if(!TALLER1_ONLINE || !container){ if(container) container.innerHTML=''; return; }
   let ts = TALLER1_ONLINE.verificado;
   try{ ts = new Date(TALLER1_ONLINE.verificado).toLocaleDateString('es-CL', {dateStyle:'medium'}); }catch(e){}
-  const c = TALLER1_ONLINE.correos;
-  const correosHtml = c ? `
-    <div class="stat-row" style="margin:0 0 6px;">
-      <div class="stat-card">
-        <div class="stat-value">${Number(c.enviados).toLocaleString('es-CL')}</div>
-        <div class="stat-label">Correos de bienvenida enviados</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">${Number(c.pendientes).toLocaleString('es-CL')}</div>
-        <div class="stat-label">Pendientes de envío</div>
-      </div>
-      ${c.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(c.errores).toLocaleString('es-CL')}</div><div class="stat-label">Con error (correo inválido)</div></div>` : ''}
-    </div>` : '';
   container.innerHTML = `
     <div class="trend-title" style="margin-bottom:8px;">🧑‍💻 Taller 1 Online — rumbo a la Connectathon</div>
     <div class="stat-row" style="margin:0 0 6px;">
@@ -1500,7 +1562,6 @@ function renderTaller1(){
         <div class="stat-label">Total inscritos</div>
       </div>
     </div>
-    ${correosHtml}
     <p class="footer-note" style="margin-top:6px;">${TALLER1_ONLINE.fuente === 'Google Sheets (automático)' ? 'Actualizado automáticamente' : 'Verificado manualmente'} el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos (nombre, correo, teléfono), aquí solo se muestra el total agregado — nunca el listado individual.</p>
   `;
 }
