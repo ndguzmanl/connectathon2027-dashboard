@@ -31,6 +31,14 @@
   .panel{ background:var(--panel2); border:1px solid var(--border); border-radius:0 10px 10px 10px; padding:24px; }
   .hidden{display:none !important;}
 
+  .pw-gate-overlay{position:fixed; inset:0; background:rgba(5,9,18,.72); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px;}
+  .pw-gate-box{background:var(--panel2); border:1px solid var(--border); border-radius:var(--radius); padding:26px 28px; width:100%; max-width:340px; box-shadow:0 12px 40px rgba(0,0,0,.4);}
+  .pw-gate-title{font-size:16px; font-weight:700; margin-bottom:6px;}
+  .pw-gate-desc{margin:0 0 14px; font-size:13px; color:var(--text-dim);}
+  .pw-gate-input{width:100%; padding:9px 11px; font-size:14px; border-radius:8px; border:1px solid var(--border); background:#0d1526; color:var(--text); margin-bottom:8px;}
+  .pw-gate-error{min-height:16px; color:#e05252; font-size:12px; margin-bottom:4px;}
+  .pw-gate-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px;}
+
   .stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:22px;}
   .stat-card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px;}
   .stat-card .label{font-size:11.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px;}
@@ -192,6 +200,19 @@
   <button class="tab-btn" data-tab="ops">✅ Acciones de Operaciones</button>
   <button class="tab-btn" data-tab="invitados">👥 Lista de Invitados</button>
   <button class="tab-btn" data-tab="sponsors">🏢 Sponsors</button>
+</div>
+
+<div id="pwGateOverlay" class="pw-gate-overlay hidden">
+  <div class="pw-gate-box">
+    <div class="pw-gate-title">🔒 Acceso protegido</div>
+    <p class="pw-gate-desc">Esta sección requiere contraseña.</p>
+    <input type="password" id="pwGateInput" class="pw-gate-input" placeholder="Contraseña" autocomplete="off">
+    <div id="pwGateError" class="pw-gate-error"></div>
+    <div class="pw-gate-actions">
+      <button id="pwGateCancel" class="btn secondary">Cancelar</button>
+      <button id="pwGateSubmit" class="btn">Entrar</button>
+    </div>
+  </div>
 </div>
 
 <main>
@@ -969,15 +990,59 @@ const CARTA_TEXTOS_POR_TIPO = {
   sponsor: CARTA_TEXTO_SPONSOR
 };
 
-// ---------- Tabs ----------
+// ---------- Tabs (con gate de contraseña para Invitados y Sponsors) ----------
+const PW_GATE_PASSWORD = 'hl7240195';
+const PW_GATE_PROTECTED = { invitados:true, sponsors:true };
+const pwGateUnlocked = {};
+let pwGatePendingTab = null;
+
+function activateTab(tabKey){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tabKey));
+  document.getElementById('tab-comms').classList.toggle('hidden', tabKey!=='comms');
+  document.getElementById('tab-ops').classList.toggle('hidden', tabKey!=='ops');
+  document.getElementById('tab-invitados').classList.toggle('hidden', tabKey!=='invitados');
+  document.getElementById('tab-sponsors').classList.toggle('hidden', tabKey!=='sponsors');
+}
+
+function showPwGate(tabKey){
+  pwGatePendingTab = tabKey;
+  document.getElementById('pwGateError').textContent = '';
+  document.getElementById('pwGateInput').value = '';
+  document.getElementById('pwGateOverlay').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('pwGateInput').focus(), 50);
+}
+function hidePwGate(){
+  document.getElementById('pwGateOverlay').classList.add('hidden');
+  pwGatePendingTab = null;
+}
+function tryPwGateSubmit(){
+  if(!pwGatePendingTab) return;
+  const val = document.getElementById('pwGateInput').value;
+  if(val === PW_GATE_PASSWORD){
+    pwGateUnlocked[pwGatePendingTab] = true;
+    const tabKey = pwGatePendingTab;
+    hidePwGate();
+    activateTab(tabKey);
+  } else {
+    document.getElementById('pwGateError').textContent = 'Contraseña incorrecta.';
+    document.getElementById('pwGateInput').value = '';
+    document.getElementById('pwGateInput').focus();
+  }
+}
+
+document.getElementById('pwGateSubmit').addEventListener('click', tryPwGateSubmit);
+document.getElementById('pwGateCancel').addEventListener('click', hidePwGate);
+document.getElementById('pwGateInput').addEventListener('keydown', e=>{ if(e.key==='Enter') tryPwGateSubmit(); });
+document.getElementById('pwGateOverlay').addEventListener('click', e=>{ if(e.target.id==='pwGateOverlay') hidePwGate(); });
+
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-comms').classList.toggle('hidden', btn.dataset.tab!=='comms');
-    document.getElementById('tab-ops').classList.toggle('hidden', btn.dataset.tab!=='ops');
-    document.getElementById('tab-invitados').classList.toggle('hidden', btn.dataset.tab!=='invitados');
-    document.getElementById('tab-sponsors').classList.toggle('hidden', btn.dataset.tab!=='sponsors');
+    const tabKey = btn.dataset.tab;
+    if(PW_GATE_PROTECTED[tabKey] && !pwGateUnlocked[tabKey]){
+      showPwGate(tabKey);
+      return;
+    }
+    activateTab(tabKey);
   });
 });
 
