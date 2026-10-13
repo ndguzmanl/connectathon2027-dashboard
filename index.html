@@ -107,7 +107,8 @@
   .section-title:first-child{border-top:none; margin-top:0; padding-top:0;}
   .section-note{font-size:11.5px; font-weight:400; color:var(--text-dim); font-style:italic;}
   .section-progress{font-size:11.5px; color:var(--text-dim); font-weight:400;}
-  input.mini{width:100%; min-width:110px;}
+  input.mini,select.mini{width:100%; min-width:110px;}
+  select.estado-sel{padding:4px 6px;}
   input.mini-num{width:80px;}
   .row-check{transform:scale(1.2); cursor:pointer;}
   .done-row td{opacity:.55;}
@@ -278,8 +279,10 @@
       <select id="opsSeccionFilter"><option value="">Todas las secciones</option></select>
       <select id="opsEstadoFilter">
         <option value="">Todos los estados</option>
-        <option value="done">Completadas</option>
-        <option value="pending">Pendientes</option>
+        <option value="Aprobado">Aprobado (completada)</option>
+        <option value="Solicitado">Solicitado</option>
+        <option value="No realizado">No realizado</option>
+        <option value="Denegado">Denegado</option>
       </select>
       <input type="text" id="opsSearch" placeholder="Buscar acción...">
       <div class="spacer"></div>
@@ -814,6 +817,10 @@ let nextInvitadosId = 1;
 let sponsors = [];
 let nextSponsorsId = 1;
 
+// Clave validada contra el backend al desbloquear Invitados/Sponsors (en memoria, se
+// pierde al recargar la página). Nunca se guarda una contraseña fija en este archivo.
+let unlockedKey = null;
+
 
 /* ===== LIVE SYNC vía Apps Script API (lectura y escritura en Google Sheets) ===== */
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbzIcjM3GI9r1kCOuaukGVeyU3hVuS96Q4bX1862Kk0b8-yvojhuY366ILKsZ3D7215J/exec';
@@ -827,7 +834,8 @@ function setLiveSyncStatus(msg, ok){
 
 async function fetchLiveData(){
   try{
-    const res = await fetch(API_BASE_URL, {cache:'no-store'});
+    const url = unlockedKey ? (API_BASE_URL + '?key=' + encodeURIComponent(unlockedKey)) : API_BASE_URL;
+    const res = await fetch(url, {cache:'no-store'});
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if(!data.ok) throw new Error(data.error || 'Respuesta no OK');
@@ -836,17 +844,19 @@ async function fetchLiveData(){
       nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
       refreshComms();
     }
-    if(data.operaciones && data.operaciones.length){
+    if(data.operaciones && data.operaciones.some(o=>o && String(o.texto||'').trim())){
       ops = data.operaciones;
       nextOpsId = Math.max(...ops.map(o=>o.id), 0) + 1;
       refreshOps();
     }
-    if(data.invitados && data.invitados.length){
+    // invitados/sponsors solo llegan como array si la clave enviada era correcta;
+    // si no, el servidor devuelve null y simplemente no se actualizan (quedan ocultos).
+    if(Array.isArray(data.invitados)){
       invitados = data.invitados;
       nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
       refreshInvitados();
     }
-    if(data.sponsors && data.sponsors.length){
+    if(Array.isArray(data.sponsors)){
       sponsors = data.sponsors;
       nextSponsorsId = Math.max(...sponsors.map(s=>s.id), 0) + 1;
       refreshSponsors();
@@ -878,10 +888,12 @@ async function fetchLiveData(){
  */
 async function writeFieldToSheet(sheetKey, id, field, value){
   try{
+    const body = { sheet: sheetKey, id, field, value };
+    if((sheetKey === 'invitados' || sheetKey === 'sponsors') && unlockedKey) body.key = unlockedKey;
     const res = await fetch(API_BASE_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ sheet: sheetKey, id, field, value })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if(!data.ok) throw new Error(data.error || 'Error desconocido');
@@ -900,10 +912,12 @@ async function writeFieldToSheet(sheetKey, id, field, value){
  */
 async function appendRowToSheet(sheetKey, data){
   try{
+    const body = { sheet: sheetKey, op: 'append', data };
+    if((sheetKey === 'invitados' || sheetKey === 'sponsors') && unlockedKey) body.key = unlockedKey;
     const res = await fetch(API_BASE_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ sheet: sheetKey, op: 'append', data })
+      body: JSON.stringify(body)
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error || 'Error desconocido');
@@ -920,10 +934,12 @@ async function appendRowToSheet(sheetKey, data){
  */
 async function deleteRowFromSheet(sheetKey, id){
   try{
+    const body = { sheet: sheetKey, op: 'delete', id };
+    if((sheetKey === 'invitados' || sheetKey === 'sponsors') && unlockedKey) body.key = unlockedKey;
     const res = await fetch(API_BASE_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ sheet: sheetKey, op: 'delete', id })
+      body: JSON.stringify(body)
     });
     const json = await res.json();
     if(!json.ok) throw new Error(json.error || 'Error desconocido');
@@ -990,8 +1006,9 @@ const CARTA_TEXTOS_POR_TIPO = {
   sponsor: CARTA_TEXTO_SPONSOR
 };
 
-// ---------- Tabs (con gate de contraseña para Invitados y Sponsors) ----------
-const PW_GATE_PASSWORD = 'hl7240195';
+// ---------- Tabs (con gate de contraseña REAL para Invitados y Sponsors) ----------
+// La contraseña no vive en este archivo: se verifica contra el backend (Apps Script),
+// que solo entrega los datos de invitados/sponsors cuando la clave es correcta.
 const PW_GATE_PROTECTED = { invitados:true, sponsors:true };
 const pwGateUnlocked = {};
 let pwGatePendingTab = null;
@@ -1015,18 +1032,42 @@ function hidePwGate(){
   document.getElementById('pwGateOverlay').classList.add('hidden');
   pwGatePendingTab = null;
 }
-function tryPwGateSubmit(){
+async function tryPwGateSubmit(){
   if(!pwGatePendingTab) return;
+  const tabKey = pwGatePendingTab;
   const val = document.getElementById('pwGateInput').value;
-  if(val === PW_GATE_PASSWORD){
-    pwGateUnlocked[pwGatePendingTab] = true;
-    const tabKey = pwGatePendingTab;
-    hidePwGate();
-    activateTab(tabKey);
-  } else {
-    document.getElementById('pwGateError').textContent = 'Contraseña incorrecta.';
-    document.getElementById('pwGateInput').value = '';
-    document.getElementById('pwGateInput').focus();
+  const submitBtn = document.getElementById('pwGateSubmit');
+  const errEl = document.getElementById('pwGateError');
+  errEl.textContent = '';
+  submitBtn.disabled = true;
+  try{
+    const res = await fetch(API_BASE_URL + '?key=' + encodeURIComponent(val), {cache:'no-store'});
+    const data = await res.json();
+    const ok = data && data.ok && (Array.isArray(data.invitados) || Array.isArray(data.sponsors));
+    if(ok){
+      unlockedKey = val;
+      pwGateUnlocked[tabKey] = true;
+      if(Array.isArray(data.invitados)){
+        invitados = data.invitados;
+        nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
+        refreshInvitados();
+      }
+      if(Array.isArray(data.sponsors)){
+        sponsors = data.sponsors;
+        nextSponsorsId = Math.max(...sponsors.map(s=>s.id), 0) + 1;
+        refreshSponsors();
+      }
+      hidePwGate();
+      activateTab(tabKey);
+    } else {
+      errEl.textContent = 'Contraseña incorrecta.';
+      document.getElementById('pwGateInput').value = '';
+      document.getElementById('pwGateInput').focus();
+    }
+  } catch(err){
+    errEl.textContent = 'No se pudo verificar la contraseña (sin conexión). Intenta de nuevo.';
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
@@ -1209,9 +1250,18 @@ function sectionOrder(){
   return seen;
 }
 
+const OPS_ESTADOS = ['No realizado','Solicitado','Aprobado','Denegado'];
+function opsEstado(o){
+  const e = (o.estado||'').trim().toLowerCase();
+  const m = OPS_ESTADOS.find(x=>x.toLowerCase()===e);
+  if(m) return m;
+  return o.completado ? 'Aprobado' : 'No realizado';
+}
+function opsIsDone(o){ return opsEstado(o)==='Aprobado'; }
+
 function renderOpsStats(){
   const total = ops.length;
-  const done = ops.filter(o=>o.completado).length;
+  const done = ops.filter(opsIsDone).length;
   const conResp = ops.filter(o=>o.responsable && o.responsable.trim()).length;
   const pct = total? Math.round(done/total*100):0;
   document.getElementById('opsStats').innerHTML = `
@@ -1259,8 +1309,7 @@ function renderOps(){
     if(seccionF && secKey!==seccionF) return;
     const items = ops.filter(o=>{
       if(o.seccion!==secKey) return false;
-      if(estadoF==='done' && !o.completado) return false;
-      if(estadoF==='pending' && o.completado) return false;
+      if(estadoF && opsEstado(o)!==estadoF) return false;
       if(q && !o.texto.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -1268,26 +1317,25 @@ function renderOps(){
     const secTitle = ops.find(o=>o.seccion===secKey).seccionTitulo;
     const plazo = ops.find(o=>o.seccion===secKey).plazo;
     const allItems = ops.filter(o=>o.seccion===secKey);
-    const doneCount = allItems.filter(o=>o.completado).length;
+    const doneCount = allItems.filter(opsIsDone).length;
 
     const wrap = document.createElement('div');
     wrap.innerHTML = `<div class="section-title">
         ${secTitle}
         ${plazo ? `<span class="section-note">Plazo: ${plazo}</span>`:''}
-        <span class="section-progress badge-count">${doneCount}/${allItems.length} completadas</span>
+        <span class="section-progress badge-count">${doneCount}/${allItems.length} aprobadas</span>
       </div>
       <table>
         <thead><tr>
-          <th style="width:34px;"></th><th>Acción</th><th>Responsable</th><th>Correo</th><th>Teléfono</th><th></th>
+          <th>Acción a realizar</th><th>Responsable</th><th>Quién toma la decisión</th><th>Estado</th><th></th>
         </tr></thead>
         <tbody>
           ${items.map(o=>`
-            <tr class="${o.completado?'done-row':''}">
-              <td><input type="checkbox" class="row-check" ${o.completado?'checked':''} data-id="${o.id}" data-field="completado"></td>
+            <tr class="${opsIsDone(o)?'done-row':''}">
               <td class="texto-cell">${escapeHtml(o.texto)}</td>
               <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(o.responsable)}" data-id="${o.id}" data-field="responsable"></td>
-              <td><input class="mini" type="email" placeholder="—" value="${escapeHtml(o.correo)}" data-id="${o.id}" data-field="correo"></td>
-              <td><input class="mini" type="tel" placeholder="—" value="${escapeHtml(o.telefono)}" data-id="${o.id}" data-field="telefono"></td>
+              <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(o.decisor||'')}" data-id="${o.id}" data-field="decisor"></td>
+              <td><select class="mini estado-sel" data-id="${o.id}" data-field="estado">${OPS_ESTADOS.map(x=>`<option value="${x}" ${opsEstado(o)===x?'selected':''}>${x}</option>`).join('')}</select></td>
               <td><button class="btn small secondary" data-id="${o.id}" data-action="delOps">✕</button></td>
             </tr>
           `).join('')}
@@ -1296,7 +1344,7 @@ function renderOps(){
     container.appendChild(wrap);
   });
 
-  container.querySelectorAll('input,button').forEach(el=>{
+  container.querySelectorAll('input,select,button').forEach(el=>{
     if(el.dataset.field){
       el.addEventListener('change', onOpsFieldChange);
     } else if(el.dataset.action==='delOps'){
@@ -1320,7 +1368,16 @@ async function onOpsFieldChange(e){
   const item = ops.find(o=>o.id===id);
   if(!item) return;
   let apiValue;
-  if(field==='completado'){ item.completado = e.target.checked; apiValue = e.target.checked; }
+  if(field==='estado'){
+    item.estado = e.target.value; item.completado = (e.target.value==='Aprobado'); apiValue = e.target.value;
+    renderOpsStats(); renderOps();
+    const ok1 = await writeFieldToSheet('operaciones', id, 'estado', apiValue);
+    const ok2 = await writeFieldToSheet('operaciones', id, 'completado', item.completado);
+    const ok = ok1 && ok2;
+    flashSaveState(e.target, ok);
+    if(ok){ setLiveSyncStatus('🟢 Guardado correctamente en Google Sheets', true); }
+    return;
+  }
   else { item[field] = e.target.value; apiValue = e.target.value; }
   renderOpsStats();
   renderOps();
@@ -1343,7 +1400,7 @@ document.getElementById('addOpsBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('addOpsBtn');
   const originalLabel = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
-  const newItem = {seccion, seccionTitulo: secInfo.seccionTitulo, plazo: secInfo.plazo, texto, completado:false, responsable:'', correo:'', telefono:''};
+  const newItem = {seccion, seccionTitulo: secInfo.seccionTitulo, plazo: secInfo.plazo, texto, completado:false, responsable:'', decisor:'', estado:'No realizado', correo:'', telefono:''};
   const newId = await appendRowToSheet('operaciones', newItem);
   btn.disabled = false; btn.textContent = originalLabel;
   if(newId === null){
