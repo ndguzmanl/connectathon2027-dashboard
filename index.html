@@ -109,6 +109,8 @@
   .section-progress{font-size:11.5px; color:var(--text-dim); font-weight:400;}
   input.mini,select.mini{width:100%; min-width:110px;}
   select.estado-sel{padding:4px 6px;}
+  input.texto-input{min-width:260px;}
+  .done-row .texto-cell input{text-decoration:line-through;}
   input.mini-num{width:80px;}
   .row-check{transform:scale(1.2); cursor:pointer;}
   .done-row td{opacity:.55;}
@@ -1332,7 +1334,7 @@ function renderOps(){
         <tbody>
           ${items.map(o=>`
             <tr class="${opsIsDone(o)?'done-row':''}">
-              <td class="texto-cell">${escapeHtml(o.texto)}</td>
+              <td class="texto-cell"><input class="mini texto-input" type="text" value="${escapeHtml(o.texto)}" data-id="${o.id}" data-field="texto"></td>
               <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(o.responsable)}" data-id="${o.id}" data-field="responsable"></td>
               <td><input class="mini" type="text" placeholder="—" value="${escapeHtml(o.decisor||'')}" data-id="${o.id}" data-field="decisor"></td>
               <td><select class="mini estado-sel" data-id="${o.id}" data-field="estado">${OPS_ESTADOS.map(x=>`<option value="${x}" ${opsEstado(o)===x?'selected':''}>${x}</option>`).join('')}</select></td>
@@ -1381,7 +1383,7 @@ async function onOpsFieldChange(e){
   else { item[field] = e.target.value; apiValue = e.target.value; }
   renderOpsStats();
   renderOps();
-  const ok = await writeFieldToSheet('operaciones', id, field, apiValue);
+  const ok = await writeFieldToSheet('operaciones', id, field==='texto'?'accion':field, apiValue);
   flashSaveState(e.target, ok);
   if(ok){ setLiveSyncStatus('🟢 Guardado correctamente en Google Sheets', true); }
 }
