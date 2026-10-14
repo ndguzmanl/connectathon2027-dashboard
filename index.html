@@ -354,7 +354,7 @@
 
     <table>
       <thead><tr>
-        <th>Trato</th><th>Nombre</th><th>Apellido</th><th>Cargo</th><th>Empresa</th><th>Correo</th><th>Tipo</th><th>Carta enviada</th><th>Carta</th><th></th>
+        <th>Trato</th><th>Nombre</th><th>Apellido</th><th>Cargo</th><th>Empresa</th><th>Correo</th><th>Tipo</th><th>Carta enviada</th><th>Carta generada</th><th>Carta</th><th></th>
       </tr></thead>
       <tbody id="invitadosBody"></tbody>
     </table>
@@ -377,6 +377,15 @@
       </select>
       <button class="btn" id="addInvitadoBtn">+ Agregar invitado</button>
     </div>
+    <details style="margin-top:12px;">
+      <summary style="cursor:pointer;font-weight:600;">📥 Importar nómina (pegar desde Excel / Google Sheets)</summary>
+      <p class="section-note" style="margin:8px 0;">Pega una fila por invitado con las columnas: <strong>Nombre, Apellido, Cargo, Empresa, Correo, Tipo</strong> (Tipo: autoridad, miembro o sponsor; puede ir vacío). Separadas por tabulación, punto y coma o coma. Si la primera fila trae encabezados se omite.</p>
+      <textarea id="importNominaText" rows="6" style="width:100%;" placeholder="Carolina	González	Decana	USS	carolina.gonzalez@uss.cl	autoridad"></textarea>
+      <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn" id="importNominaBtn">Importar nómina</button>
+        <span id="importNominaStatus" class="section-note"></span>
+      </div>
+    </details>
     <p class="footer-note" style="margin-top:10px;">
       Al agregar un invitado con su tipo asignado, la carta queda lista de inmediato: usa los botones "📄 PDF" y "✉ Correo" de su fila para descargarla o enviarla — no hace falta un paso de "generar carta" aparte. "Enviar a correo" descarga el PDF y abre tu cliente de correo con el destinatario y asunto prellenados — los navegadores no permiten adjuntar archivos automáticamente por seguridad, así que deberás arrastrar el PDF recién descargado al correo antes de enviarlo.
     </p>
@@ -888,6 +897,14 @@ async function fetchLiveData(){
  * Usamos Content-Type: text/plain para evitar el preflight CORS (Apps Script no
  * responde OPTIONS). El propio script parsea el body como JSON igualmente.
  */
+let _authAlertShown = false;
+function reportApiError(err){
+  if(err && String(err.message||err)==='unauthorized' && !_authAlertShown){
+    _authAlertShown = true;
+    alert('No se pudo guardar: la clave no fue aceptada por el servidor o esta página está desactualizada.\n\nRecarga con Ctrl+Shift+R (Cmd+Shift+R en Mac), entra de nuevo a Invitados/Sponsors con la clave y repite la acción.');
+    setTimeout(()=>{ _authAlertShown = false; }, 10000);
+  }
+}
 async function writeFieldToSheet(sheetKey, id, field, value){
   try{
     const body = { sheet: sheetKey, id, field, value };
@@ -902,6 +919,7 @@ async function writeFieldToSheet(sheetKey, id, field, value){
     return true;
   } catch(err){
     console.error('Error guardando en Sheets:', err);
+    reportApiError(err);
     return false;
   }
 }
@@ -926,6 +944,7 @@ async function appendRowToSheet(sheetKey, data){
     return json.id;
   } catch(err){
     console.error('Error agregando fila en Sheets:', err);
+    reportApiError(err);
     return null;
   }
 }
@@ -1483,6 +1502,10 @@ function renderInvitadosStats(){
       <div class="value">${total}</div>
     </div>
     <div class="stat-card">
+      <div class="label">Cartas generadas (PDF / correo)</div>
+      <div class="value">${invitados.filter(i=>i.cartaFecha).length} / ${total}</div>
+    </div>
+    <div class="stat-card">
       <div class="label">Cartas enviadas</div>
       <div class="value">${enviadas} / ${total}</div>
       <div class="progress-bar"><div style="width:${pct}%"></div></div>
@@ -1516,7 +1539,7 @@ function renderInvitados(){
   });
 
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="10" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
   } else {
     tbody.innerHTML = filtered.map(i => `
       <tr class="${i.enviada?'done-row':''}">
@@ -1540,6 +1563,7 @@ function renderInvitados(){
           </select>
         </td>
         <td style="text-align:center;"><input type="checkbox" class="row-check" ${i.enviada?'checked':''} data-id="${i.id}" data-field="enviada"></td>
+        <td style="font-size:12px;white-space:nowrap;">${i.cartaFecha?escapeHtml(i.cartaFecha):'<span style="opacity:.5">—</span>'}</td>
         <td class="carta-actions">
           <button class="btn small secondary" data-id="${i.id}" data-action="dlInvitadoCarta">📄 PDF</button>
           <button class="btn small secondary" data-id="${i.id}" data-action="mailInvitadoCarta">✉ Correo</button>
@@ -1604,7 +1628,7 @@ document.getElementById('addInvitadoBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('addInvitadoBtn');
   const originalLabel = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
-  const newItem = { tratamiento, nombre, apellido, cargo, empresa, email, tipo, enviada:false };
+  const newItem = { tratamiento, nombre, apellido, cargo, empresa, email, tipo, enviada:false, cartaFecha:'' };
   const newId = await appendRowToSheet('invitados', newItem);
   btn.disabled = false; btn.textContent = originalLabel;
   if(newId === null){
@@ -1622,6 +1646,36 @@ document.getElementById('addInvitadoBtn').addEventListener('click', async ()=>{
   document.getElementById('newInvitadoTipo').value = '';
   refreshInvitados();
   setLiveSyncStatus('🟢 Invitado guardado en Google Sheets', true);
+});
+
+document.getElementById('importNominaBtn').addEventListener('click', async ()=>{
+  const txt = document.getElementById('importNominaText').value;
+  const st = document.getElementById('importNominaStatus');
+  const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ st.textContent = 'Pega primero la nómina.'; return; }
+  const rows = lines.map(l=>{
+    const sep = l.includes('\t') ? '\t' : (l.includes(';') ? ';' : ',');
+    return l.split(sep).map(x=>x.trim());
+  });
+  if(/^nombre$/i.test(rows[0][0]||'')) rows.shift();
+  const tipos = {autoridad:'autoridad', autoridades:'autoridad', miembro:'miembro', 'miembro hl7':'miembro', sponsor:'sponsor', sponsors:'sponsor'};
+  const btn = document.getElementById('importNominaBtn');
+  btn.disabled = true;
+  let okN = 0, fail = 0;
+  for(let k=0;k<rows.length;k++){
+    const r = rows[k];
+    if(!r[0]){ fail++; continue; }
+    const item = { tratamiento:'Estimado', nombre:r[0]||'', apellido:r[1]||'', cargo:r[2]||'', empresa:r[3]||'', email:r[4]||'', tipo: tipos[String(r[5]||'').toLowerCase()]||'', enviada:false, cartaFecha:'' };
+    st.textContent = 'Importando ' + (k+1) + ' de ' + rows.length + '…';
+    const id = await appendRowToSheet('invitados', item);
+    if(id===null){ fail++; continue; }
+    item.id = id; invitados.push(item); okN++;
+  }
+  btn.disabled = false;
+  nextInvitadosId = Math.max(...invitados.map(i=>i.id), 0) + 1;
+  refreshInvitados();
+  st.textContent = okN + ' invitados importados' + (fail ? (', ' + fail + ' con error (revisa la fila o la clave)') : '') + '.';
+  if(okN){ document.getElementById('importNominaText').value=''; setLiveSyncStatus('🟢 Nómina importada en Google Sheets', true); }
 });
 
 refreshInvitados();
@@ -2044,6 +2098,17 @@ function downloadInvitadoCarta(id){
   const carta = invitadoToCarta(inv);
   const doc = buildCartaDoc(carta);
   doc.save(cartaFileName(carta));
+  registrarCartaGenerada(inv);
+}
+
+async function registrarCartaGenerada(inv){
+  const hoy = new Date();
+  const f = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+  inv.cartaFecha = f;
+  refreshInvitados();
+  const ok = await writeFieldToSheet('invitados', inv.id, 'cartaFecha', f);
+  if(ok){ setLiveSyncStatus('🟢 Carta registrada en Google Sheets', true); }
+  else { setLiveSyncStatus('🟠 La carta se generó pero no se pudo registrar en Google Sheets', false); }
 }
 
 function emailInvitadoCarta(id){
