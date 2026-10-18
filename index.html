@@ -150,6 +150,11 @@
   .ep-track-row .et-label{font-size:12px; color:var(--text);}
   .ep-track-row .et-val{font-size:12px; font-weight:700; text-align:right; color:var(--text-dim);}
   .ep-track-bar{grid-column:1 / -1; background:#0d1526; border-radius:5px; height:7px; overflow:hidden;}
+  .ep-team-row{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:1px;}
+  .ep-team-chip{font-size:11px; padding:2px 8px; border-radius:10px; background:#0d1526; border:1px solid var(--border); color:var(--text-dim); white-space:nowrap;}
+  .ep-team-chip b{color:var(--text);}
+  .ep-team-chip.main{border-color:var(--accent); color:var(--text);}
+  .ep-team-chip.warn{border-color:#d9a441; color:#d9a441;}
   .ep-track-bar > div{height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2));}
   .trend-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:10px;}
   .trend-title{font-size:13px; font-weight:700;}
@@ -1945,16 +1950,36 @@ function renderEcopass(){
     const aforoTxt = totalAforo ? `${totalInscritos} / ${totalAforo} (${pct}%)` : `${totalInscritos} (aforo por confirmar)`;
     const ventaWebTotal = aggregate ? Number(aggregate.ventaWeb) : tracks.reduce((s,t)=>s+(Number(t.data.ventaWeb)||0),0);
 
+    const conEq = tracks.filter(t=>t.data.equipos !== null && t.data.equipos !== undefined && t.data.equipos !== '');
+    const equiposTotal = conEq.reduce((a,t)=>a+(Number(t.data.equipos)||0),0);
+    const equiposTotalHtml = conEq.length
+      ? `<div class="ep-metric"><span class="k">Equipos formados (todos los tracks)</span><span class="v">${equiposTotal}${conEq.length<tracks.length?` · faltan datos de ${tracks.length-conEq.length} track(s)`:''}</span></div>`
+      : '';
+
     const tracksHtml = tracks.map(t=>{
       const d = t.data;
       const dAforo = Number(d.aforo) || 0;
       const dInscritos = Number(d.inscritos) || 0;
       const tpct = dAforo ? Math.round((dInscritos/dAforo)*100) : 0;
+      const hasEq = d.equipos !== null && d.equipos !== undefined && d.equipos !== '';
+      const n3 = Number(d.equipos3)||0, n4 = Number(d.equipos4)||0, n5 = Number(d.equipos5)||0;
+      const sumaPers = n3*3 + n4*4 + n5*5;
+      const descuadra = hasEq && (n3+n4+n5>0) && sumaPers !== dInscritos;
+      const teamHtml = hasEq ? `
+          <div class="ep-team-row">
+            <span class="ep-team-chip main">Equipos formados: <b>${Number(d.equipos)}</b></span>
+            <span class="ep-team-chip">de 3 personas: <b>${n3}</b></span>
+            <span class="ep-team-chip">de 4 personas: <b>${n4}</b></span>
+            <span class="ep-team-chip">de 5 personas: <b>${n5}</b></span>
+            ${descuadra ? `<span class="ep-team-chip warn" title="Los equipos suman ${sumaPers} personas y los inscritos son ${dInscritos}. Puede haber equipos incompletos (menos de 3) o compras sin completar.">⚠ suma ${sumaPers} ≠ ${dInscritos} inscritos</span>` : ''}
+          </div>` : `
+          <div class="ep-team-row"><span class="ep-team-chip">Equipos formados: pendiente de datos de Ecopass</span></div>`;
       return `
         <div class="ep-track-row">
           <div class="et-label">${escapeHtml(t.track)}</div>
           <div class="et-val">${dInscritos} / ${dAforo || '—'}${dAforo ? ` (${tpct}%)` : ''}</div>
           <div class="ep-track-bar"><div style="width:${dAforo ? tpct : 0}%"></div></div>
+          ${teamHtml}
         </div>`;
     }).join('');
 
@@ -1965,6 +1990,7 @@ function renderEcopass(){
         <div class="ep-metric"><span class="k">Inscritos totales / Aforo</span><span class="v">${aforoTxt}</span></div>
         <div class="ep-metric"><span class="k">Venta web</span><span class="v">$${Number(ventaWebTotal||0).toLocaleString('es-CL')}</span></div>
         <div class="ep-metric"><span class="k">Precio ticket</span><span class="v">${ref.precio===0? 'Gratuito':'$'+Number(ref.precio).toLocaleString('es-CL')}</span></div>
+        ${equiposTotalHtml}
         ${ctaFor(ref)}
         <div class="ep-tracks">
           <div class="ep-tracks-title">Inscritos por track (${tracks.length})</div>
