@@ -396,7 +396,7 @@
     </p>
 
     <p class="footer-note">
-      Registro de personas que deben recibir una Carta Especial (autoridades, miembros HL7 y sponsors). Marca la casilla "Carta enviada" una vez que confirmes el envío de la carta a esa persona. Esta tabla se guarda en Google Sheets, en una pestaña llamada "invitados".
+      Registro de personas que deben recibir una Carta Especial (autoridades, miembros HL7 y sponsors). Marca la casilla "Carta enviada" una vez que confirmes el envío de la carta a esa persona. Esta tabla se guarda en Google Sheets, en una pestaña llamada "invitados". Además, se suman en vivo las filas de la hoja <a href="https://docs.google.com/spreadsheets/d/1Gce_amDwNtHEo31CkeraqC0-ufPu4VrW9LnEfh0sIyg/edit" target="_blank" rel="noopener">«Cartas invitación»</a> (marcadas 🔗 hoja): se actualizan solas al recargar o cada 5 minutos y se editan en esa hoja, no aquí. Cada correo de una fila aparece como un invitado aparte con el mismo nombre. La columna «Tipo de carta» de la hoja elige la plantilla de arriba y la carta queda registrada con su fecha (no se envía). Si un correo de la hoja ya está en esta lista, no se repite.
     </p>
   </section>
 
@@ -1546,7 +1546,7 @@ function renderInvitados(){
   if(!filtered.length){
     tbody.innerHTML = `<tr><td colspan="11" style="color:var(--text-dim); text-align:center; padding:16px;">${invitados.length? 'No hay invitados que coincidan con el filtro.' : 'Aún no hay invitados registrados.'}</td></tr>`;
   } else {
-    tbody.innerHTML = filtered.map(i => `
+    tbody.innerHTML = filtered.map(i => i.origen==='hoja' ? filaInvitadoHoja(i) : `
       <tr class="${i.enviada?'done-row':''}">
         <td>
           <select data-id="${i.id}" data-field="tratamiento">
@@ -1613,6 +1613,27 @@ async function onInvitadoFieldChange(e){
   const ok = await writeFieldToSheet('invitados', id, field, apiValue);
   flashSaveState(e.target, ok);
   if(ok){ setLiveSyncStatus('🟢 Guardado correctamente en Google Sheets', true); }
+}
+
+// Fila de solo lectura: viene en vivo desde la hoja "CARTAS INVITACION". Se edita en la hoja, no aquí.
+function filaInvitadoHoja(i){
+  const t = v => v ? escapeHtml(v) : '<span style="opacity:.5">—</span>';
+  return `
+      <tr class="${i.enviada?'done-row':''}" title="Viene de la hoja «Cartas invitación». Para cambiar estos datos, edita la hoja.">
+        <td>${t(i.tratamiento)}</td>
+        <td>${t(i.nombre)}</td>
+        <td>${t(i.apellido)}</td>
+        <td>${t(i.cargo)}</td>
+        <td>${t(i.empresa)}</td>
+        <td style="word-break:break-all;">${t(i.email)}</td>
+        <td>${t(INVITADO_TIPO_LABEL[i.tipo] || i.tipo)}</td>
+        <td style="text-align:center;">${i.enviada?'✔':'—'}</td>
+        <td style="font-size:12px;white-space:nowrap;">${i.cartaFecha?'Registrada '+escapeHtml(i.cartaFecha):'<span style="opacity:.5">Sin tipo de carta</span>'}</td>
+        <td class="carta-actions">
+          ${i.tipo ? `<button class="btn small secondary" data-id="${i.id}" data-action="dlInvitadoCarta">📄 PDF</button>` : ''}
+        </td>
+        <td><span class="section-note" style="white-space:nowrap;">🔗 hoja</span></td>
+      </tr>`;
 }
 
 function refreshInvitados(){ renderInvitadosStats(); renderInvitados(); }
@@ -2132,6 +2153,7 @@ async function registrarCartaGenerada(inv){
   const f = hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
   inv.cartaFecha = f;
   refreshInvitados();
+  if(inv.origen==='hoja') return; // fila de la hoja de cartas: solo lectura
   const ok = await writeFieldToSheet('invitados', inv.id, 'cartaFecha', f);
   if(ok){ setLiveSyncStatus('🟢 Carta registrada en Google Sheets', true); }
   else { setLiveSyncStatus('🟠 La carta se generó pero no se pudo registrar en Google Sheets', false); }
