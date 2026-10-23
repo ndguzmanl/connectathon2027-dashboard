@@ -341,6 +341,7 @@
     </div>
 
     <div class="stat-row" id="invitadosStats"></div>
+    <div class="stat-row" id="invitadosLinkStats" style="margin-top:0;"></div>
 
     <div class="toolbar">
       <select id="invitadosTipoFilter">
@@ -1526,6 +1527,23 @@ function renderInvitadosStats(){
   `;
 }
 
+// Correos con el link de Ecopass (día 1) enviados a los invitados de la hoja «Cartas invitación».
+function renderInvitadosLinkStats(){
+  const el = document.getElementById('invitadosLinkStats');
+  if(!el) return;
+  const hoja = invitados.filter(i=>i.origen==='hoja');
+  if(!hoja.length){ el.innerHTML=''; return; }
+  const env = hoja.filter(i=>i.linkEnviado).length;
+  const pct = Math.round(env/hoja.length*100);
+  el.innerHTML = `
+    <div class="stat-card">
+      <div class="label">Correos con link Ecopass enviados</div>
+      <div class="value">${env} / ${hoja.length}</div>
+      <div class="progress-bar"><div style="width:${pct}%"></div></div>
+    </div>
+    <p class="section-note" style="align-self:center;margin:0;">Se envía automáticamente al marcar «CARTA ENVIADA = Sí» en la hoja de cartas; la columna «LINK ECOPASS ENVIADO» pasa sola a «Enviado».</p>`;
+}
+
 function renderInvitados(){
   const tipoF = document.getElementById('invitadosTipoFilter').value;
   const estadoF = document.getElementById('invitadosEstadoFilter').value;
@@ -1636,7 +1654,7 @@ function filaInvitadoHoja(i){
       </tr>`;
 }
 
-function refreshInvitados(){ renderInvitadosStats(); renderInvitados(); }
+function refreshInvitados(){ renderInvitadosStats(); renderInvitadosLinkStats(); renderInvitados(); }
 
 document.getElementById('invitadosTipoFilter').addEventListener('change', renderInvitados);
 document.getElementById('invitadosEstadoFilter').addEventListener('change', renderInvitados);
