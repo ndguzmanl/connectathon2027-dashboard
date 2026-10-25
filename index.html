@@ -887,6 +887,7 @@ async function fetchLiveData(){
       TALLER1_ONLINE.verificado = data.taller1.ts || TALLER1_ONLINE.verificado;
       TALLER1_ONLINE.fuente = 'Google Sheets (automático)';
       TALLER1_ONLINE.correos = (data.taller1.correos && typeof data.taller1.correos.enviados === 'number') ? data.taller1.correos : null;
+      TALLER1_ONLINE.correosLink = (data.taller1.correosLink && typeof data.taller1.correosLink.enviados === 'number') ? data.taller1.correosLink : null;
       renderTaller1();
     }
     const now = new Date();
@@ -2071,6 +2072,20 @@ function renderTaller1(){
       </div>
       ${c.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(c.errores).toLocaleString('es-CL')}</div><div class="stat-label">Con error (correo inválido)</div></div>` : ''}
     </div>` : '';
+  const l = TALLER1_ONLINE.correosLink;
+  const linkHtml = l ? `
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card">
+        <div class="stat-value">${Number(l.enviados).toLocaleString('es-CL')}</div>
+        <div class="stat-label">Correos enviados con el link (Zoom)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${Number(l.pendientes).toLocaleString('es-CL')}</div>
+        <div class="stat-label">Link pendiente de envío</div>
+      </div>
+      ${l.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(l.errores).toLocaleString('es-CL')}</div><div class="stat-label">Link con error</div></div>` : ''}
+    </div>
+    ${l.duplicados ? `<p class="footer-note" style="margin:0 0 6px;">${Number(l.duplicados).toLocaleString('es-CL')} inscripciones repetidas (mismo correo) reciben un solo correo.</p>` : ''}` : '';
   container.innerHTML = `
     <div class="trend-title" style="margin-bottom:8px;">🧑‍💻 Taller 1 Online — rumbo a la Connectathon</div>
     <div class="stat-row" style="margin:0 0 6px;">
@@ -2080,6 +2095,7 @@ function renderTaller1(){
       </div>
     </div>
     ${correosHtml}
+    ${linkHtml}
     <p class="footer-note" style="margin-top:6px;">${TALLER1_ONLINE.fuente === 'Google Sheets (automático)' ? 'Actualizado automáticamente' : 'Verificado manualmente'} el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos (nombre, correo, teléfono), aquí solo se muestra el total agregado — nunca el listado individual.</p>
   `;
 }
