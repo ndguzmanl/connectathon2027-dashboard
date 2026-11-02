@@ -228,6 +228,7 @@
   <section id="tab-comms" class="panel">
     <div class="ecopass-wrap" id="ecopassCard"></div>
     <div class="chart-card" id="taller1Card" style="margin:14px 32px 0; max-height:none;"></div>
+    <div class="chart-card" id="taller2Card" style="margin:14px 32px 0; max-height:none;"></div>
 
     <div class="stat-row" id="commsStats"></div>
 
@@ -823,6 +824,9 @@ const TALLER1_ONLINE = {
 };
 /*TALLER1_END*/
 
+// Taller 2 Online: se llena automáticamente desde la API (taller2) cuando el formulario esté conectado.
+const TALLER2_ONLINE = { total: null, verificado: null, fuente: '', correos: null };
+
 let comms = JSON.parse(JSON.stringify(COMMS_DATA));
 let ops = JSON.parse(JSON.stringify(OPS_DATA));
 let nextCommsId = Math.max(...comms.map(c=>c.id), 0) + 1;
@@ -889,6 +893,13 @@ async function fetchLiveData(){
       TALLER1_ONLINE.correos = (data.taller1.correos && typeof data.taller1.correos.enviados === 'number') ? data.taller1.correos : null;
       TALLER1_ONLINE.correosLink = (data.taller1.correosLink && typeof data.taller1.correosLink.enviados === 'number') ? data.taller1.correosLink : null;
       renderTaller1();
+    }
+    if(data.taller2 && typeof data.taller2.total === 'number'){
+      TALLER2_ONLINE.total = data.taller2.total;
+      TALLER2_ONLINE.verificado = data.taller2.ts || TALLER2_ONLINE.verificado;
+      TALLER2_ONLINE.fuente = 'Google Sheets (automático)';
+      TALLER2_ONLINE.correos = (data.taller2.correos && typeof data.taller2.correos.enviados === 'number') ? data.taller2.correos : null;
+      renderTaller2();
     }
     const now = new Date();
     const hh = String(now.getHours()).padStart(2,'0');
@@ -2054,6 +2065,39 @@ function renderEcopass(){
   container.innerHTML = cardsHtml;
 }
 
+function renderTaller2(){
+  const container = document.getElementById('taller2Card');
+  if(!container) return;
+  const titulo = '<div class="trend-title" style="margin-bottom:8px;">🧑‍💻 Taller 2 Online — rumbo a la Connectathon</div>';
+  if(typeof TALLER2_ONLINE.total !== 'number'){
+    container.innerHTML = titulo + `
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Total inscritos</div></div>
+    </div>
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Correos de bienvenida enviados</div></div>
+      <div class="stat-card"><div class="stat-value">—</div><div class="stat-label">Pendientes de envío</div></div>
+    </div>
+    <p class="footer-note" style="margin-top:6px;">Formulario de inscripción del Taller 2 aún no conectado. Los números aparecerán solos apenas se conecte la planilla de respuestas.</p>`;
+    return;
+  }
+  let ts = TALLER2_ONLINE.verificado;
+  try{ ts = new Date(TALLER2_ONLINE.verificado).toLocaleDateString('es-CL', {dateStyle:'medium'}); }catch(e){}
+  const c = TALLER2_ONLINE.correos;
+  const correosHtml = c ? `
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card"><div class="stat-value">${Number(c.enviados).toLocaleString('es-CL')}</div><div class="stat-label">Correos de bienvenida enviados</div></div>
+      <div class="stat-card"><div class="stat-value">${Number(c.pendientes).toLocaleString('es-CL')}</div><div class="stat-label">Pendientes de envío</div></div>
+      ${c.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(c.errores).toLocaleString('es-CL')}</div><div class="stat-label">Con error (correo inválido)</div></div>` : ''}
+    </div>` : '';
+  container.innerHTML = titulo + `
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card"><div class="stat-value">${Number(TALLER2_ONLINE.total).toLocaleString('es-CL')}</div><div class="stat-label">Total inscritos</div></div>
+    </div>
+    ${correosHtml}
+    <p class="footer-note" style="margin-top:6px;">Actualizado automáticamente el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos, aquí solo se muestra el total agregado — nunca el listado individual.</p>`;
+}
+
 function renderTaller1(){
   const container = document.getElementById('taller1Card');
   if(!TALLER1_ONLINE || !container){ if(container) container.innerHTML=''; return; }
@@ -2235,6 +2279,7 @@ refreshComms();
 refreshOps();
 renderEcopass();
 renderTaller1();
+renderTaller2();
 </script>
 </body>
 </html>
