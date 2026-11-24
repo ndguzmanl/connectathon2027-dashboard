@@ -825,7 +825,7 @@ const TALLER1_ONLINE = {
 /*TALLER1_END*/
 
 // Taller 2 Online: se llena automáticamente desde la API (taller2) cuando el formulario esté conectado.
-const TALLER2_ONLINE = { total: null, verificado: null, fuente: '', correos: null };
+const TALLER2_ONLINE = { total: null, verificado: null, fuente: '', correos: null, correosLink: null };
 
 let comms = JSON.parse(JSON.stringify(COMMS_DATA));
 let ops = JSON.parse(JSON.stringify(OPS_DATA));
@@ -899,6 +899,7 @@ async function fetchLiveData(){
       TALLER2_ONLINE.verificado = data.taller2.ts || TALLER2_ONLINE.verificado;
       TALLER2_ONLINE.fuente = 'Google Sheets (automático)';
       TALLER2_ONLINE.correos = (data.taller2.correos && typeof data.taller2.correos.enviados === 'number') ? data.taller2.correos : null;
+      TALLER2_ONLINE.correosLink = (data.taller2.correosLink && typeof data.taller2.correosLink.enviados === 'number') ? data.taller2.correosLink : null;
       renderTaller2();
     }
     const now = new Date();
@@ -2090,11 +2091,20 @@ function renderTaller2(){
       <div class="stat-card"><div class="stat-value">${Number(c.pendientes).toLocaleString('es-CL')}</div><div class="stat-label">Pendientes de envío</div></div>
       ${c.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(c.errores).toLocaleString('es-CL')}</div><div class="stat-label">Con error (correo inválido)</div></div>` : ''}
     </div>` : '';
+  const l2 = TALLER2_ONLINE.correosLink;
+  const linkHtml2 = (l2 && (l2.enviados || l2.errores || l2.duplicados)) ? `
+    <div class="stat-row" style="margin:0 0 6px;">
+      <div class="stat-card"><div class="stat-value">${Number(l2.enviados).toLocaleString('es-CL')}</div><div class="stat-label">Correos enviados con el link (Zoom)</div></div>
+      <div class="stat-card"><div class="stat-value">${Number(l2.pendientes).toLocaleString('es-CL')}</div><div class="stat-label">Link pendiente de envío</div></div>
+      ${l2.errores ? `<div class="stat-card"><div class="stat-value" style="color:#b45309;">${Number(l2.errores).toLocaleString('es-CL')}</div><div class="stat-label">Link con error</div></div>` : ''}
+    </div>
+    ${l2.duplicados ? `<p class="footer-note" style="margin:0 0 6px;">${Number(l2.duplicados).toLocaleString('es-CL')} inscripciones repetidas (mismo correo) reciben un solo correo.</p>` : ''}` : '';
   container.innerHTML = titulo + `
     <div class="stat-row" style="margin:0 0 6px;">
       <div class="stat-card"><div class="stat-value">${Number(TALLER2_ONLINE.total).toLocaleString('es-CL')}</div><div class="stat-label">Total inscritos</div></div>
     </div>
     ${correosHtml}
+    ${linkHtml2}
     <p class="footer-note" style="margin-top:6px;">Actualizado automáticamente el ${ts} contra la planilla de respuestas del formulario. Por privacidad de los datos de los inscritos, aquí solo se muestra el total agregado — nunca el listado individual.</p>`;
 }
 
